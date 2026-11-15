@@ -1,0 +1,43 @@
+#version 450
+// hbao.comp - horizon-based AO: march D screen directions, track max horizon elevation
+#include "lighting/lighting_common.glsl"
+#include "lighting/ao_common.glsl"
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(vec2(px), uOutSize))) return;
+    vec2 uv = (vec2(px) + 0.5) / uOutSize;
+    float d = textureLod(uDepth, uv, 0.0).r;
+    if (isSky(d)) { imageStore(uAOOut, px, vec4(1)); return; }
+    vec3 P = viewPosFromDepth(uv, d);
+    vec3 N = aoViewNormal(uv);
+    float radius = uAOParams.x;
+    float radiusPx = min(radius * projScale() / -P.z, 128.0);   // screen radius in output pixels... at full res
+    radiusPx *= uOutSize.y * uRenderSize.w;
+    if (radiusPx < 1.0) { imageStore(uAOOut, px, vec4(1)); return; }
+    int D = uAOCfg.y, S = uAOCfg.z;
+    float stepPx = radiusPx / float(S + 1);
+    float rnd = ign(vec2(px), frameIndex());
+    float ao = 0.0;
+    for (int i = 0; i < D; ++i) {
+        float ang = 6.2831853 * (float(i) + rnd) / float(D);
+        vec2 dir = vec2(cos(ang), sin(ang));
+        float maxSin = 0.0;  // relative to tangent plane via N
+        float acc = 0.0;
+        float t = stepPx * (0.5 + rnd);
+        for (int j = 0; j < S; ++j, t += stepPx) {
+            vec2 suv = uv + dir * t / uOutSize;
+            if (any(lessThan(suv, vec2(0))) || any(greaterThan(suv, vec2(1)))) break;
+            vec3 H = aoViewPos(suv) - P;
+            float l2 = dot(H, H);
+            float sinH = dot(N, H) * inversesqrt(l2 + 1e-6) - uAOParams.z;
+            if (sinH > maxSin) {
+                float fall = clamp(1.0 - l2 / (radius * radius), 0.0, 1.0);
+                acc += (sinH - maxSin) * fall;
+                maxSin = sinH;
+            }
+        }
+        ao += acc;
+    }
+    imageStore(uAOOut, px, vec4(clamp(1.0 - ao / float(D), 0.0, 1.0)));
+}

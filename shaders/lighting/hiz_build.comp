@@ -1,0 +1,24 @@
+#version 450
+// hiz_build.comp - depth pyramid storing the CLOSEST depth per cell (max, because reversed-Z).
+// Mip 0 is a copy of the depth buffer; each dispatch builds level N from N-1.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 6) uniform sampler2D uSrc;        // previous level (or depth for level 0)
+layout(r32f, binding = 0) uniform writeonly image2D uDst;
+layout(std140, binding = 3) uniform HiZPass { ivec4 uHiZ; };   // x = source level (-1 = copy depth)
+#define uSrcLevel uHiZ.x
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dsz = imageSize(uDst);
+    if (any(greaterThanEqual(p, dsz))) return;
+    if (uSrcLevel < 0) { imageStore(uDst, p, vec4(texelFetch(uSrc, p, 0).r)); return; }
+    ivec2 ssz = textureSize(uSrc, uSrcLevel);
+    ivec2 s = p * 2;
+    float d = texelFetch(uSrc, min(s, ssz - 1), uSrcLevel).r;
+    d = max(d, texelFetch(uSrc, min(s + ivec2(1, 0), ssz - 1), uSrcLevel).r);
+    d = max(d, texelFetch(uSrc, min(s + ivec2(0, 1), ssz - 1), uSrcLevel).r);
+    d = max(d, texelFetch(uSrc, min(s + ivec2(1, 1), ssz - 1), uSrcLevel).r);
+    // odd sizes: fold in the extra row/column
+    if ((ssz.x & 1) != 0 && p.x == dsz.x - 1) d = max(d, texelFetch(uSrc, min(s + ivec2(2, 0), ssz - 1), uSrcLevel).r);
+    if ((ssz.y & 1) != 0 && p.y == dsz.y - 1) d = max(d, texelFetch(uSrc, min(s + ivec2(0, 2), ssz - 1), uSrcLevel).r);
+    imageStore(uDst, p, vec4(d));
+}

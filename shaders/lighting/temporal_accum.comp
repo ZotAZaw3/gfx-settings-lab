@@ -1,0 +1,34 @@
+#version 450
+// temporal_accum.comp - reprojected exponential history for noisy SS passes (SSR, SSGI, GTAO).
+// Neighborhood clamp rejects stale history; depth test rejects disocclusions.
+#include "lighting/lighting_common.glsl"
+layout(local_size_x = 8, local_size_y = 8) in;
+#ifndef OUT_FMT
+#define OUT_FMT rgba16f   // r8 for AO history (define OUT_FMT=r8)
+#endif
+layout(binding = 3) uniform sampler2D uDepth;
+layout(binding = 4) uniform sampler2D uVelocity;      // scene.velocity: NDC(cur) - NDC(prev)
+layout(binding = 5) uniform sampler2D uCurrent;
+layout(binding = 6) uniform sampler2D uHistory;
+layout(OUT_FMT, binding = 0) uniform writeonly image2D uOut;
+layout(std140, binding = 3) uniform TemporalPass { vec4 uTA; };   // xy size, z alpha (new frame weight), w reset
+#define uOutSize uTA.xy
+#define uAlpha uTA.z
+#define uReset int(uTA.w)
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(vec2(px), uOutSize))) return;
+    vec2 uv = (vec2(px) + 0.5) / uOutSize;
+    vec4 cur = textureLod(uCurrent, uv, 0.0);
+    if (uReset != 0) { imageStore(uOut, px, cur); return; }
+    vec4 mn = cur, mx = cur;
+    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
+        vec4 c = textureLod(uCurrent, uv + vec2(x, y) / uOutSize, 0.0);
+        mn = min(mn, c); mx = max(mx, c);
+    }
+    vec2 prevUV = velocityToPrevUv(uv, textureLod(uVelocity, uv, 0.0).xy);
+    if (any(lessThan(prevUV, vec2(0))) || any(greaterThan(prevUV, vec2(1)))) { imageStore(uOut, px, cur); return; }
+    vec4 hist = clamp(textureLod(uHistory, prevUV, 0.0), mn, mx);
+    imageStore(uOut, px, mix(hist, cur, uAlpha));
+}

@@ -1,0 +1,34 @@
+#version 450
+// ssao.comp - normal-oriented hemisphere SSAO with range check
+#include "lighting/lighting_common.glsl"
+#include "lighting/ao_common.glsl"
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(vec2(px), uOutSize))) return;
+    vec2 uv = (vec2(px) + 0.5) / uOutSize;
+    float d = textureLod(uDepth, uv, 0.0).r;
+    if (isSky(d)) { imageStore(uAOOut, px, vec4(1)); return; }
+    vec3 P = viewPosFromDepth(uv, d);
+    vec3 N = aoViewNormal(uv);
+    float rnd = ign(vec2(px), frameIndex());
+    vec3 rv = normalize(vec3(cos(rnd * 6.2831853), sin(rnd * 6.2831853), 0.0));
+    vec3 T = normalize(rv - N * dot(rv, N));
+    mat3 TBN = mat3(T, cross(N, T), N);
+    int K = uAOCfg.y;
+    float radius = uAOParams.x, bias = uAOParams.z;
+    float occ = 0.0;
+    for (int i = 0; i < K; ++i) {
+        vec2 h = hammersley(uint(i), uint(K));
+        h.y = fract(h.y + rnd);
+        vec3 k = cosineSample(h);
+        float scale = mix(0.1, 1.0, pow(float(i + 1) / float(K), 2.0));
+        vec3 S = P + TBN * k * radius * scale;
+        vec3 sp = projectView(S);
+        if (any(lessThan(sp.xy, vec2(0))) || any(greaterThan(sp.xy, vec2(1)))) continue;
+        float sceneZ = aoViewPos(sp.xy).z;
+        float range = smoothstep(0.0, 1.0, radius / abs(P.z - sceneZ));
+        occ += (sceneZ >= S.z + bias ? 1.0 : 0.0) * range;
+    }
+    imageStore(uAOOut, px, vec4(1.0 - occ / float(K)));
+}

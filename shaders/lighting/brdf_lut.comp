@@ -1,0 +1,35 @@
+#version 450
+// brdf_lut.comp - split-sum DFG LUT: x = NoV, y = roughness -> (A, B) so spec = F0*A + B
+#include "lighting/lighting_common.glsl"
+#include "common/surface.glsl"
+#include "lighting/pbr_common.glsl"
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(std430, binding = 5) writeonly buffer BrdfLutOut { vec2 brdfLut[]; };
+#define BRDF_LUT_SIZE 32
+void main() {
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = ivec2(BRDF_LUT_SIZE);
+    if (any(greaterThanEqual(id, size))) return;
+    float NoV = max((float(id.x) + 0.5) / float(size.x), 1e-3);
+    float rough = (float(id.y) + 0.5) / float(size.y);
+    float a = rough * rough;
+    vec3 V = vec3(sqrt(1.0 - NoV * NoV), 0.0, NoV);
+    float A = 0.0, B = 0.0;
+    const uint S = 512u;
+    for (uint i = 0u; i < S; ++i) {
+        vec2 u = hammersley(i, S);
+        float phi = 2.0 * PI * u.x;
+        float cosT = sqrt((1.0 - u.y) / (1.0 + (a * a - 1.0) * u.y));
+        float sinT = sqrt(1.0 - cosT * cosT);
+        vec3 H = vec3(sinT * cos(phi), sinT * sin(phi), cosT);
+        vec3 L = reflect(-V, H);
+        float NoL = clamp(L.z, 0.0, 1.0), NoH = clamp(H.z, 0.0, 1.0), VoH = clamp(dot(V, H), 0.0, 1.0);
+        if (NoL > 0.0) {
+            float Vis = V_SmithGGXCorrelated(NoV, NoL, a) * 4.0 * NoL * VoH / max(NoH, 1e-5);
+            float Fc = pow(1.0 - VoH, 5.0);
+            A += (1.0 - Fc) * Vis;
+            B += Fc * Vis;
+        }
+    }
+    brdfLut[id.y * BRDF_LUT_SIZE + id.x] = vec2(A, B) / float(S);
+}

@@ -161,7 +161,8 @@ bool Engine::init(const EngineConfig& cfg) {
     passes_.sort();
     for (auto& p : passes_.passes()) {
         if (p.owner == "core") continue;
-        if (p.stage == Stage::Lighting) hasLightingModule_ = true;
+        // The deferred resolve belongs to the lighting area; RT/GI passes in Stage::Lighting don't replace it.
+        if (p.stage == Stage::Lighting && p.owner.rfind("lighting", 0) == 0) hasLightingModule_ = true;
         if (p.stage == Stage::ToneMap) hasToneMapModule_ = true;
     }
     std::printf("[engine] %zu modules, %zu passes, %zu settings\n", modules_.size(), passes_.passes().size(), settings_.all().size());

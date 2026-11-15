@@ -134,8 +134,23 @@ void Engine::addCorePasses() {
     }, -100.0f);
     passes_.add(Stage::FrameSetup, "Frame constants", [this](FrameContext& ctx) { fillFrameConstants(ctx); }, 1000.0f);
 
+    // ---- Sky pipelines (forward color+velocity, G-buffer velocity only) ----
+    {
+        rhi::PipelineDesc d;
+        d.program = fullscreenProgram("core/sky.frag", {"SKY_VELOCITY_ONLY=1"});
+        d.raster.cull = rhi::CullMode::None;
+        d.depth.test = false; d.depth.write = false;
+        for (int i = 0; i < 4; ++i) d.blend[i].writeMask = 0;
+        corePipelines_.push_back(device_->createPipeline(d));
+        d.program = fullscreenProgram("core/sky.frag");
+        for (int i = 0; i < 4; ++i) d.blend[i].writeMask = 0xF;
+        corePipelines_.push_back(device_->createPipeline(d));
+    }
+    rhi::Pipeline* skyVelocityP = corePipelines_[corePipelines_.size() - 2].get();
+    rhi::Pipeline* skyForwardP = corePipelines_.back().get();
+
     // ---- GBuffer ----
-    passes_.add(Stage::GBuffer, "G-Buffer", [this](FrameContext& ctx) {
+    passes_.add(Stage::GBuffer, "G-Buffer", [this, skyVelocityP](FrameContext& ctx) {
         rhi::RenderPassDesc rp;
         rp.name = "G-Buffer";
         const char* names[] = {"gbuffer.albedo", "gbuffer.normal", "gbuffer.material", "gbuffer.emissive", "scene.velocity"};
@@ -146,6 +161,8 @@ void Engine::addCorePasses() {
         rp.depth.load = rhi::LoadOp::Clear;
         rp.depth.clearDepth = 0.0f;
         ctx.cmd.beginRenderPass(rp);
+        ctx.cmd.bindPipeline(skyVelocityP);      // sky motion vectors (camera rotation) before geometry
+        ctx.cmd.draw(3);
         SceneDrawParams p;
         p.mode = DrawMode::GBuffer;
         p.viewProj = ctx.frame.viewProj;
@@ -172,7 +189,7 @@ void Engine::addCorePasses() {
     }, 100.0f, [this] { return !hasLightingModule_ && msaaSamples_ <= 1; });
 
     // ---- Forward (MSAA) ----
-    passes_.add(Stage::Forward, "Forward + MSAA", [this](FrameContext& ctx) {
+    passes_.add(Stage::Forward, "Forward + MSAA", [this, skyForwardP](FrameContext& ctx) {
         for (auto& m : modules_) m->bindShadingResources(ctx);
         rhi::RenderPassDesc rp;
         rp.name = "Forward MSAA";
@@ -181,6 +198,7 @@ void Engine::addCorePasses() {
         rp.colors[1].texture = ctx.targets.get("msaa.velocity"); rp.colors[1].load = rhi::LoadOp::Clear;
         rp.depth.texture = ctx.targets.get("msaa.depth"); rp.depth.load = rhi::LoadOp::Clear;
         ctx.cmd.beginRenderPass(rp);
+        if (!ctx.replaceLighting) { ctx.cmd.bindPipeline(skyForwardP); ctx.cmd.draw(3); }
         SceneDrawParams p;
         p.mode = DrawMode::Forward;
         p.viewProj = ctx.frame.viewProj;

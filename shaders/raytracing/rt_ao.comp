@@ -1,0 +1,24 @@
+#version 450
+// RT ambient occlusion: cosine-weighted short occlusion rays. docs/raytracing_ao.md
+layout(local_size_x = 8, local_size_y = 8) in;
+#include "raytracing/rt_common.glsl"
+#include "raytracing/rt_gbuffer.glsl"
+layout(binding = 0, r16f) uniform writeonly image2D uOut; // AO, 1 = unoccluded
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(px, sizes.xy))) return;
+    GSample g = loadG(fullTexel(px));
+    if (!g.valid) { imageStore(uOut, px, vec4(1.0)); return; }
+    Rng rng = rngInit(uvec2(px), uint(frameInfo.x), 2u);
+    int rays = max(frameInfo.y, 1);
+    float radius = effectParams.x;
+    vec3 o = offsetOrigin(g.pos, g.n);
+    float occl = 0.0;
+    for (int i = 0; i < rays; ++i) {
+        vec3 d = sampleCosineHemisphere(g.n, rand2(rng));
+        Hit h;
+        if (rtTrace(o, d, radius, true, h)) occl += 1.0 - h.t / radius * 0.5; // soft falloff
+    }
+    imageStore(uOut, px, vec4(1.0 - occl / float(rays)));
+}

@@ -1,0 +1,39 @@
+#version 450
+// SVGF step 2: one iteration of the edge-avoiding a-trous wavelet filter (5x5 B3 spline, step 2^i).
+// rgb = signal, a = variance (filtered with squared weights). docs/denoising.md
+layout(local_size_x = 8, local_size_y = 8) in;
+#include "raytracing/rt_common.glsl"
+#include "raytracing/rt_gbuffer.glsl"
+layout(binding = 4) uniform sampler2D uIn;
+layout(binding = 0, rgba16f) uniform writeonly image2D uOut;
+
+const float kKernel[3] = float[3](1.0, 2.0 / 3.0, 1.0 / 6.0);
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(px, sizes.xy))) return;
+    vec4 center = texelFetch(uIn, px, 0);
+    GSample g = loadG(fullTexel(px));
+    if (!g.valid) { imageStore(uOut, px, center); return; }
+    int step = int(denoiseParams.y);
+    float lC = luminance(center.rgb);
+    float sigmaL = denoiseParams.w * sqrt(max(center.a, 0.0)) + 1e-4;
+    float planeTol = 0.02 * length(g.pos - camPos.xyz) * float(step) + 1e-3;
+
+    vec3 sum = vec3(0.0); float var = 0.0; float wSum = 0.0;
+    for (int y = -2; y <= 2; ++y)
+    for (int x = -2; x <= 2; ++x) {
+        ivec2 q = px + ivec2(x, y) * step;
+        if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, sizes.xy))) continue;
+        vec4 s = texelFetch(uIn, q, 0);
+        GSample gq = loadG(fullTexel(q));
+        if (!gq.valid) continue;
+        float wN = pow(max(dot(g.n, gq.n), 0.0), 64.0);
+        float wZ = exp(-abs(dot(g.n, gq.pos - g.pos)) / planeTol);
+        float wL = exp(-abs(luminance(s.rgb) - lC) / sigmaL);
+        float w = kKernel[abs(x)] * kKernel[abs(y)] * wN * wZ * wL;
+        sum += s.rgb * w; var += s.a * w * w; wSum += w;
+    }
+    vec4 outV = wSum > 1e-6 ? vec4(sum / wSum, var / (wSum * wSum)) : center;
+    imageStore(uOut, px, outV);
+}

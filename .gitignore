@@ -1,0 +1,9 @@
+build*/
+settings.ini
+imgui.ini
+*.png
+!docs/**/*.png
+!assets/**/*.png
+.vscode/
+.vs/
+out/

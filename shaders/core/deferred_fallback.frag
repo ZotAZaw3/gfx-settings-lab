@@ -2,6 +2,7 @@
 // Core fallback deferred resolve, used only when no lighting module is compiled in.
 #include "common/frame.glsl"
 #include "lighting/shade.glsl"
+#include "core/sky.glsl"
 
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 oColor;
@@ -11,13 +12,6 @@ layout(binding = 1) uniform sampler2D tNormal;
 layout(binding = 2) uniform sampler2D tMaterial;
 layout(binding = 3) uniform sampler2D tEmissive;
 layout(binding = 4) uniform sampler2D tDepth;
-
-vec3 skyColor(vec3 dir) {
-    float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 sky = mix(vec3(0.75, 0.8, 0.9), vec3(0.25, 0.45, 0.85), t);
-    float sun = pow(max(dot(dir, normalize(uSunDirection.xyz)), 0.0), 800.0);
-    return sky * 1.5 + uSunColor.rgb * sun * 40.0;
-}
 
 void main() {
     float depth = texture(tDepth, vUV).r;

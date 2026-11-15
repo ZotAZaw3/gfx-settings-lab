@@ -93,6 +93,7 @@ struct MemTracker {
     std::mutex mtx;
     std::map<std::string, size_t> perOwner;
     size_t tex = 0, buf = 0;
+    uint64_t texturesDestroyed = 0;   // GL reuses texture names: cached FBOs must be dropped when one dies
     void add(const std::string& owner, size_t bytes, bool isTex) {
         std::lock_guard<std::mutex> l(mtx);
         perOwner[owner] += bytes; (isTex ? tex : buf) += bytes;
@@ -144,7 +145,7 @@ public:
         gpuBytes_ *= std::max(1u, d.samples);
         mem_.add(desc_.owner, gpuBytes_, true);
     }
-    ~GLTexture() override { glDeleteTextures(1, &id); mem_.sub(desc_.owner, gpuBytes_, true); }
+    ~GLTexture() override { glDeleteTextures(1, &id); mem_.sub(desc_.owner, gpuBytes_, true); ++mem_.texturesDestroyed; }
     uintptr_t nativeHandle() const override { return id; }
     GLuint id = 0;
     GLenum target = GL_TEXTURE_2D;
@@ -380,6 +381,7 @@ private:
     GLuint indexBuffer_ = 0;
     bool inPass_ = false;
     bool readOnlyDepth_ = false;
+    uint64_t seenDestroyed_ = 0;
     std::unordered_map<std::string, GLuint> fboCache_;
 };
 
@@ -615,6 +617,7 @@ public:
         return true;
     }
 
+    uint64_t texturesDestroyed() const { return mem_.texturesDestroyed; }
     GLuint emptyVao_ = 0, readFbo_ = 0, drawFbo_ = 0;
 
 private:
@@ -630,6 +633,11 @@ private:
 
 // ---------------------------------------------------------------------------------------
 GLuint GLCommandList::fboFor(const RenderPassDesc& pass) {
+    if (dev_.texturesDestroyed() != seenDestroyed_) {
+        for (auto& [k, f] : fboCache_) glDeleteFramebuffers(1, &f);
+        fboCache_.clear();
+        seenDestroyed_ = dev_.texturesDestroyed();
+    }
     std::string key;
     key.reserve(96);
     auto addKey = [&](Texture* t, uint32_t mip, uint32_t layer) {

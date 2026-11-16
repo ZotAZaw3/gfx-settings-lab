@@ -66,6 +66,22 @@ Turning streaming **off** makes every texture fully resident at the Texture Qual
   uploaded in one go (the first upload each frame is always allowed so nothing starves).
 
 <!-- bench: textures.streaming textures.poolSizeMB textures.uploadBufferMB textures.streamingMipBias -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Texture Streaming | Off | -7.675 | -3.780 | -3.476 | +5.0 | +5.3 |
+| Texture Streaming | On | -4.000 | -3.626 | -3.645 | +0.0 | +5.3 |
+| Streaming Pool Size | 16 MB | +4.878 | +2.946 | +2.957 | -8.5 | +0.0 |
+| Streaming Pool Size | 512 MB | +2.253 | +1.433 | +1.523 | +0.0 | +0.0 |
+| Streaming Pool Size | 4096 MB | -3.439 | -4.737 | -4.642 | +0.0 | +0.0 |
+| Streaming Buffer Size | 0.5 MB/frame | +6.894 | +9.386 | +9.496 | +0.0 | +0.0 |
+| Streaming Buffer Size | 16.0 MB/frame | +1.419 | +1.101 | +1.341 | +0.0 | +0.0 |
+| Streaming Buffer Size | 128.0 MB/frame | +3.039 | +5.789 | +5.839 | +0.0 | +0.0 |
+| Streaming Mip Bias | 0 | -6.663 | -0.296 | -0.595 | +0.0 | +0.0 |
+| Streaming Mip Bias | 1 | -0.271 | +1.162 | +1.176 | -16.5 | +0.0 |
+| Streaming Mip Bias | 2 | -4.233 | -0.086 | -0.374 | -20.6 | +0.0 |
+| Streaming Mip Bias | 3 | -8.830 | -5.265 | -5.546 | -21.7 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

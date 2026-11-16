@@ -35,6 +35,10 @@
 - Mode switches are slow (hundreds of ms) and reallocate everything; never do them per frame.
 
 <!-- bench: display.windowMode display.resolution -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
 <!-- /bench -->
 (The benchmark skips these: they need a real monitor. Measure output-resolution cost with Render Resolution instead.)
 

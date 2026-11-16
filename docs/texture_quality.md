@@ -62,6 +62,14 @@ formats exist for a compressed path.
   quality, so "Ultra" with BC7 costs what "High" costs uncompressed.
 
 <!-- bench: textures.quality -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Texture Quality | Low | -0.772 | -1.671 | -1.762 | -16.0 | +0.0 |
+| Texture Quality | Medium | -0.206 | -0.514 | -0.609 | +0.0 | +2.9 |
+| Texture Quality | High | +2.271 | +2.067 | +2.142 | +0.0 | +2.9 |
+| Texture Quality | Ultra | +3.672 | +5.363 | +5.358 | +0.0 | +2.9 |
 <!-- /bench -->
 
 The procedural scene has five 1024² textures and one 256² texture, so Medium/High/Ultra are

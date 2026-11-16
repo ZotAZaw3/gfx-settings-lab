@@ -13,7 +13,7 @@ csv_path = pathlib.Path(sys.argv[1])
 docs = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else "docs")
 rows = list(csv.DictReader(open(csv_path)))
 gpu = csv_path.stem.replace("_", " ").strip()
-pat = re.compile(r"<!-- bench:([^>]*)-->.*?<!-- /bench -->", re.S)
+pat = re.compile(r"^<!-- bench:([^>]*)-->.*?^<!-- /bench -->", re.S | re.M)   # markers must start a line
 
 def table(ids):
     out = [f"Measured on `{gpu}` (deltas vs the High preset; from `{csv_path.name}`):", "",

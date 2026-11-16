@@ -35,6 +35,12 @@ running. It's a development feature: edit `shaders/lighting/ssao.frag`, save, se
 - Keep permutations few: each define combination is a separate program to compile and cache.
 
 <!-- bench: shaders.hotReload -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Shader Hot Reload | Off | +2.936 | +2.941 | +3.147 | +0.0 | +0.0 |
+| Shader Hot Reload | On | +0.813 | +1.661 | +1.734 | +0.0 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

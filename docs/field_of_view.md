@@ -26,6 +26,13 @@ affect depth precision.
   > 110° shows strong rectilinear stretching. Panini projection (post module) can reduce it.
 
 <!-- bench: display.fov -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Field of View | 40 deg | +14.013 | +18.256 | +18.247 | +1.0 | +1.4 |
+| Field of View | 70 deg | +0.205 | +3.903 | +3.699 | +0.0 | +1.4 |
+| Field of View | 120 deg | -17.691 | -15.057 | -15.227 | -0.6 | +1.4 |
 <!-- /bench -->
 (On a software rasterizer the change is dominated by how much of the screen the textured ground covers,
 so the deltas are larger than they'd be on a GPU.)

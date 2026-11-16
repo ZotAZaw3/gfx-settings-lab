@@ -44,6 +44,17 @@ and submits just in time for the GPU. You get the same FPS (sometimes 1–3 % le
 - Combine with a frame cap below refresh and VRR for the lowest latency without tearing.
 
 <!-- bench: latency.mode latency.maxFramesInFlight -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Low Latency Mode | Off | -2.864 | +0.109 | +0.450 | +0.0 | +0.0 |
+| Low Latency Mode | On | -0.757 | -1.614 | -1.566 | +0.0 | +0.0 |
+| Low Latency Mode | On + Boost | -2.939 | -2.269 | -2.109 | +0.0 | +0.0 |
+| Max Frames in Flight | 1 | -0.054 | +2.381 | +2.297 | +0.0 | +0.0 |
+| Max Frames in Flight | 2 | +8.269 | +6.189 | +5.914 | +0.0 | +0.0 |
+| Max Frames in Flight | 3 | +0.193 | +2.710 | +2.391 | +0.0 | +0.0 |
+| Max Frames in Flight | 4 | +3.454 | +2.248 | +1.957 | +0.0 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

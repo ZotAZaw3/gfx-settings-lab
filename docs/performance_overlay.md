@@ -32,24 +32,11 @@ material AO, depth, motion vectors, emissive, or the HDR scene before post-proce
 - **Benchmark sweep**: `gfxlab --bench-settings <dir>` sets the High preset, disables V-Sync and the
   frame cap, and for every setting value measures warm-up + 60 frames vs a fresh baseline, then writes
   `<dir>/<gpu>.md` and `.csv`. `tools/fill_bench_tables.py` pastes the rows into each doc's
-  `<!-- bench: ids -->` block.
+  `<!-- bench: ids -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
 
-## Breakdown
-1. `Engine::runStage` wraps each pass: `profiler.beginPass(owner/name)` → execute → `endPass`.
-2. `Profiler::endFrame(wait)` builds a `FrameSample` (frame/cpu/gpu/wait/ram/vram) into a 600-frame history.
-3. `CoreGui::drawOverlay` renders from that history; `drawMenu` prints `costOf(setting)`.
-4. Debug view: `debug.view` → `shaders/core/output_transform.frag` picks the buffer.
-
-## Optimization
-- Overlay cost: ImGui draws a few hundred quads; "Detailed" also walks the pass list each frame (see table).
-- Timestamp queries are nearly free on desktop GPUs; reading them back immediately would serialize CPU and
-  GPU, hence the ring.
-- Measurement noise: deltas below ~0.1 ms on a GPU (or ~2 ms on llvmpipe) are noise. Thermals,
-  background apps and V-Sync distort results: the sweep forces V-Sync off.
-- Cloud numbers are from Mesa llvmpipe (CPU software rasterizer): use them for relative cost only; GPU
-  numbers on real hardware differ by 10–100×.
-
-<!-- bench: debug.overlay debug.view -->
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
 <!-- /bench -->
 
 ## Rebuild

@@ -38,6 +38,10 @@ The swapchain has a front buffer (being scanned out) and one or more back buffer
 - For lowest latency without tearing: VRR + cap 3 fps under refresh + Low Latency Mode.
 
 <!-- bench: display.vsync -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
 <!-- /bench -->
 
 (Benchmarks run with V-Sync forced Off so other settings are measured unthrottled; V-Sync itself is

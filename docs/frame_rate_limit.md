@@ -30,6 +30,10 @@ limiter never tries to "catch up" with a burst of fast frames.
   timers help; Linux nanosleep is usually fine.
 
 <!-- bench: display.frameCap -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
 <!-- /bench -->
 
 ## Rebuild

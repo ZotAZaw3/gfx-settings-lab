@@ -41,6 +41,16 @@ gets 8-bit precision where it matters.
   paper white / peak nits instead (see [hdr_output.md](hdr_output.md)).
 
 <!-- bench: display.brightness display.gamma -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Brightness | 0.50 | +1.934 | +3.289 | +3.004 | +0.0 | +0.0 |
+| Brightness | 1.00 | +7.874 | +8.520 | +8.296 | +0.0 | +0.0 |
+| Brightness | 1.50 | +3.971 | +6.254 | +5.938 | +0.0 | +0.0 |
+| Gamma | 1.60 | -6.340 | -4.487 | -4.624 | +0.0 | +0.0 |
+| Gamma | 2.20 | -3.933 | -2.573 | -2.651 | +0.0 | +0.0 |
+| Gamma | 2.80 | -7.656 | -11.360 | -11.376 | +0.0 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

@@ -43,6 +43,12 @@ Real GPU drivers on large games: minutes → seconds.
   stutter at the cost of brief visual differences.
 
 <!-- bench: shaders.cache -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Shader Cache | Off | +4.736 | +6.225 | +5.831 | +0.0 | +3.9 |
+| Shader Cache | On | +2.356 | +0.468 | -0.066 | +0.0 | +5.7 |
 <!-- /bench -->
 
 ## Rebuild

@@ -46,6 +46,19 @@ your screen:
 - Use HGIG / "HDR game mode" on TVs so the game's peak setting is respected.
 
 <!-- bench: display.hdr.mode display.hdr.peakNits display.hdr.paperWhiteNits -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| HDR Output | SDR | -4.020 | -7.840 | -7.882 | +0.0 | +0.0 |
+| HDR Output | HDR10 (PQ) | -2.616 | -2.227 | -2.283 | +0.0 | +0.0 |
+| HDR Output | scRGB (FP16) | +7.290 | +4.785 | +4.688 | +0.0 | +0.0 |
+| HDR Peak Brightness | 400 nits | +2.652 | +2.057 | +2.053 | +0.0 | +0.0 |
+| HDR Peak Brightness | 1000 nits | +5.421 | +6.705 | +6.716 | +0.0 | +0.0 |
+| HDR Peak Brightness | 10000 nits | +3.426 | +4.439 | +4.543 | +0.0 | +0.0 |
+| HDR Paper White | 80 nits | +2.197 | +4.815 | +4.829 | +0.0 | +0.0 |
+| HDR Paper White | 203 nits | +3.071 | +1.158 | +1.066 | +0.0 | +0.0 |
+| HDR Paper White | 500 nits | +4.052 | +8.972 | +8.868 | +0.0 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

@@ -48,6 +48,16 @@ is the most expensive and most robust form of anti-aliasing.
 - Supersampling (>100 %) is the reference for AA quality, but 200 % costs 4× the pixels.
 
 <!-- bench: display.renderScale display.upscaleFilter -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Render Resolution | 25 % | -75.063 | -77.682 | -77.535 | -22.9 | +0.0 |
+| Render Resolution | 100 % | -1.337 | -0.130 | +0.007 | +0.0 | +7.8 |
+| Render Resolution | 200 % | +196.433 | +196.323 | +196.293 | +72.2 | +102.8 |
+| Upscale Filter | Nearest | -6.195 | -5.756 | -5.862 | +0.0 | +0.0 |
+| Upscale Filter | Bilinear | -3.085 | -5.083 | -5.056 | +0.0 | +0.0 |
+| Upscale Filter | Catmull-Rom (bicubic) | -2.002 | -0.629 | -0.578 | +0.0 | +0.0 |
 <!-- /bench -->
 
 ## Rebuild

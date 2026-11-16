@@ -50,6 +50,10 @@ when the material's alpha mode / sidedness changes.
   threads and loads pre-baked compressed textures (KTX2/Basis, DDS/BC7).
 
 <!-- bench: scene.select -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits_.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
 <!-- /bench -->
 
 ## Rebuild

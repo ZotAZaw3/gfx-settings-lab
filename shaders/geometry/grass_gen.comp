@@ -1,0 +1,44 @@
+#version 450
+// Grass placement, one thread per candidate cell of one distance tier. Cells are snapped to world
+// space so blades don't swim when the camera moves. Density falls off with distance; far tiers use
+// bigger cells and wider blades so coverage stays constant.
+#include "geometry/geo_common.glsl"
+#include "geometry/grass_common.glsl"
+layout(local_size_x = 64) in;
+layout(std430, binding = 8) writeonly buffer Blades { Blade blades[]; };
+layout(std430, binding = 9) buffer Args { uint vertexCount; uint instanceCount; uint firstVertex; uint firstInstance; };
+layout(binding = 0) uniform sampler2D tHeightMap;
+const vec2 kPlaza = vec2(42.0, -42.0);
+const vec2 kLake = vec2(110.0, -110.0);
+void main(){
+    uint n = uint(gC.z);
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= n * n) return;
+    vec2 cell = vec2(float(i % n), float(i / n));
+    vec2 cellWorld = gC.xy + cell * gA.x;
+    vec2 rel = cellWorld - uCameraPos.xz;
+    if (max(abs(rel.x), abs(rel.y)) < gA.z) return;                  // covered by the finer tier
+    vec2 xz = cellWorld + hash22(cellWorld) * gA.x;
+    float dist = distance(xz, uCameraPos.xz);
+    float keep = 1.0 - smoothstep(gB.x * 0.6, gB.x, dist);
+    vec2 tuv = (xz - gD.xy) / gD.z + 0.5;
+    if (any(lessThan(tuv, vec2(0.002))) || any(greaterThan(tuv, vec2(0.998)))) return;
+    keep *= smoothstep(20.0, 24.0, distance(xz, kPlaza)) * smoothstep(26.0, 30.0, distance(xz, kLake));
+    if (hash12(xz * 1.37) >= keep) return;
+    float h = textureLod(tHeightMap, tuv, 0.0).r;
+    float y = h * gC.w;
+    if (h > 0.62) return;                                            // no grass on snow
+    // slope test (cliffs)
+    vec2 tx = 1.0 / vec2(textureSize(tHeightMap, 0));
+    float dx = (textureLod(tHeightMap, tuv + vec2(tx.x, 0), 0.0).r - textureLod(tHeightMap, tuv - vec2(tx.x, 0), 0.0).r) * gC.w;
+    float dz = (textureLod(tHeightMap, tuv + vec2(0, tx.y), 0.0).r - textureLod(tHeightMap, tuv - vec2(0, tx.y), 0.0).r) * gC.w;
+    if (length(vec2(dx, dz)) / (2.0 * gD.z * tx.x) > 0.7) return;
+    vec3 root = vec3(xz.x, y, xz.y);
+    float height = 0.35 + 0.45 * hash12(xz + 3.1);
+    for (int p = 0; p < 5; ++p)                                       // frustum cull (bounding sphere)
+        if (dot(gPlanes[p].xyz, root + vec3(0, height * 0.5, 0)) + gPlanes[p].w < -height) return;
+    uint idx = atomicAdd(instanceCount, 1u);
+    if (idx >= uint(gD.w)) { atomicAdd(instanceCount, uint(-1)); return; }
+    blades[idx].posRot = vec4(root, hash12(xz + 7.7) * 6.2831853);
+    blades[idx].params = vec4(height, 0.035 * gA.w, 0.3 + 0.5 * hash12(xz + 5.3), hash12(xz + 9.1));
+}

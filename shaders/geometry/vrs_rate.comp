@@ -1,0 +1,32 @@
+#version 450
+// Variable rate shading: build the shading-rate image (one texel per 16x16 tile) from luminance
+// contrast and motion. 0 = 1x1, 1 = 2x2, 2 = 4x4.
+#include "common/frame.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(std140, binding = 3) uniform VrsUBO { vec4 vrA; };   // x contrast threshold, y max rate, z motion px for +1 rate, w overlay
+layout(binding = 0) uniform sampler2D tColor;
+layout(binding = 1) uniform sampler2D tVelocity;
+layout(r32ui, binding = 0) uniform writeonly uimage2D iRate;
+shared float sMin[256], sMax[256], sVel[256];
+void main(){
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 sz = textureSize(tColor, 0);
+    ivec2 q = min(p, sz - 1);
+    float l = luminance(texelFetch(tColor, q, 0).rgb);
+    l = l / (1.0 + l);                                           // compress HDR so highlights don't dominate
+    float v = length(texelFetch(tVelocity, q, 0).xy * 0.5 * uRenderSize.xy);   // pixels moved
+    uint i = gl_LocalInvocationIndex;
+    sMin[i] = l; sMax[i] = l; sVel[i] = v;
+    barrier();
+    for (uint s = 128u; s > 0u; s >>= 1){
+        if (i < s){ sMin[i] = min(sMin[i], sMin[i + s]); sMax[i] = max(sMax[i], sMax[i + s]); sVel[i] = min(sVel[i], sVel[i + s]); }
+        barrier();
+    }
+    if (i == 0u){
+        float c = sMax[0] - sMin[0];
+        uint rate = c < vrA.x * 0.35 ? 2u : (c < vrA.x ? 1u : 0u);
+        if (sVel[0] > vrA.z) rate += 1u;                          // fast motion hides detail (motion blur / TAA)
+        rate = min(rate, uint(vrA.y));
+        imageStore(iRate, ivec2(gl_WorkGroupID.xy), uvec4(rate));
+    }
+}

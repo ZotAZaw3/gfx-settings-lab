@@ -107,11 +107,11 @@ std::vector<Profiler::PassStat> Profiler::passStats() const {
     return out;
 }
 
-void Profiler::endFrame(double waitMs) {
+void Profiler::endFrame(double waitMs, double offThreadCpuMs) {
     auto now = Clock::now();
     FrameSample s;
     s.frameMs = std::chrono::duration<double, std::milli>(now - lastFrameEnd_).count();
-    s.cpuMs = std::max(0.0, std::chrono::duration<double, std::milli>(now - frameStart_).count() - waitMs);
+    s.cpuMs = std::max(0.0, std::chrono::duration<double, std::milli>(now - frameStart_).count() - waitMs) + offThreadCpuMs;
     s.gpuMs = frameGpuAccum_;
     s.waitMs = waitMs;
     s.ramMB = processRamMB();

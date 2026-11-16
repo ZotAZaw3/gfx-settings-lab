@@ -354,6 +354,10 @@ public:
     virtual ProgramPtr  createProgram(const ProgramDesc& desc) = 0;   // use ShaderLibrary instead
     // Recompiles in place from preprocessed sources; on failure keeps the old binary.
     virtual bool        rebuildProgram(Program* program, const ProgramSources& src) = 0;
+    // On-disk program binary cache (shader cache). Empty dir = disabled.
+    virtual void        setProgramCacheDir(const std::string& dir) { (void)dir; }
+    struct ShaderCacheStats { uint32_t hits = 0, misses = 0, stores = 0; double compileMs = 0.0; };
+    virtual ShaderCacheStats shaderCacheStats() const { return {}; }
     virtual PipelinePtr createPipeline(const PipelineDesc& desc) = 0;
     virtual TimerPtr    createTimer() = 0;
     virtual CommandList& cmd() = 0;

@@ -7,3 +7,4 @@ imgui.ini
 .vscode/
 .vs/
 out/
+shader_cache/

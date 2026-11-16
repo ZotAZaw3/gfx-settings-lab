@@ -30,7 +30,7 @@ class SettingsRegistry;
 
 struct FrameSample {
     double frameMs = 0.0;     // wall time between presents
-    double cpuMs = 0.0;       // CPU time spent building the frame (excl. waits)
+    double cpuMs = 0.0;       // CPU time spent building the frame (excl. waits) + modules' off-thread CPU
     double gpuMs = 0.0;       // sum of pass GPU timings
     double waitMs = 0.0;      // time blocked in latency limiter / vsync
     double ramMB = 0.0;       // process resident set
@@ -54,7 +54,7 @@ public:
 
     // Frame boundaries (Engine)
     void beginFrame();
-    void endFrame(double waitMs);
+    void endFrame(double waitMs, double offThreadCpuMs = 0.0);
 
     // Pass timing (Engine wraps every pass)
     struct PassTimer;

@@ -2,6 +2,7 @@
 
 > Menu: **Latency (core)** · Setting id(s): core settings · Owner module: `core`
 > Values: see below · Presets: core
+> Overview page. The settings themselves are documented in [vsync.md](vsync.md), [frame_rate_limit.md](frame_rate_limit.md) and [low_latency.md](low_latency.md); dynamic resolution in [dynamic_resolution.md](dynamic_resolution.md).
 
 Settings shown in the menu: `V-Sync: Off | On | Adaptive`, `Low Latency: Off | On (ours) | Reflex* | Anti-Lag 2*`, `Frame Cap`, `Triple Buffering`, `Max Frames in Flight`, `VRR info` (read-only)
 

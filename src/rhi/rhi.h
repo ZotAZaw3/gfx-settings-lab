@@ -377,6 +377,9 @@ public:
     virtual MemoryStats memoryStats() const = 0;
     // Reads the current backbuffer (after copyToBackbuffer/UI) as top-down RGBA8 (screenshots, tests).
     virtual bool readBackbuffer(std::vector<uint8_t>& rgba, uint32_t& w, uint32_t& h) = 0;
+    // Native API objects for ImGui/interop (ID3D11Device*, ID3D11DeviceContext*); null on GL.
+    virtual void* nativeDevice() const { return nullptr; }
+    virtual void* nativeContext() const { return nullptr; }
 };
 
 

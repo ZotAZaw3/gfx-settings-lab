@@ -30,6 +30,7 @@ private:
     void drawDoc();
     Engine& engine_;
     bool initialized_ = false;
+    bool dx11_ = false;
     std::string docName_, docText_;
     bool docOpen_ = false;
     std::map<std::string, float> dragging_;

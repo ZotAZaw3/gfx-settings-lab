@@ -4,6 +4,10 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#if defined(GFX_HAS_D3D11)
+#include <d3d11.h>
+#include <imgui_impl_dx11.h>
+#endif
 
 #include <algorithm>
 #include <cstdio>
@@ -18,6 +22,9 @@ namespace gfx {
 
 CoreGui::~CoreGui() {
     if (!initialized_) return;
+#if defined(GFX_HAS_D3D11)
+    if (dx11_) ImGui_ImplDX11_Shutdown(); else
+#endif
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -32,6 +39,16 @@ void CoreGui::init() {
     ImGuiStyle& st = ImGui::GetStyle();
     st.WindowRounding = 6.0f; st.FrameRounding = 4.0f; st.GrabRounding = 4.0f;
     st.Colors[ImGuiCol_WindowBg].w = 0.92f;
+#if defined(GFX_HAS_D3D11)
+    if (engine_.device().caps().backend == rhi::Backend::D3D11) {
+        dx11_ = true;
+        ImGui_ImplGlfw_InitForOther(engine_.window(), true);
+        ImGui_ImplDX11_Init(static_cast<ID3D11Device*>(engine_.device().nativeDevice()),
+                            static_cast<ID3D11DeviceContext*>(engine_.device().nativeContext()));
+        initialized_ = true;
+        return;
+    }
+#endif
     ImGui_ImplGlfw_InitForOpenGL(engine_.window(), true);
     ImGui_ImplOpenGL3_Init("#version 450");
     initialized_ = true;
@@ -50,6 +67,9 @@ void CoreGui::openDoc(const std::string& doc) {
 }
 
 void CoreGui::render(FrameContext& ctx, bool full) {
+#if defined(GFX_HAS_D3D11)
+    if (dx11_) ImGui_ImplDX11_NewFrame(); else
+#endif
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -60,6 +80,9 @@ void CoreGui::render(FrameContext& ctx, bool full) {
     }
     if (showOverlay && engine_.settings().getInt("debug.overlay") > 0) drawOverlay(ctx);
     ImGui::Render();
+#if defined(GFX_HAS_D3D11)
+    if (dx11_) { ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData()); return; }
+#endif
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 

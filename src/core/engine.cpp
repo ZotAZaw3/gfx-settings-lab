@@ -2,6 +2,7 @@
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <cstdlib>
 
 #include <algorithm>
 #include <chrono>
@@ -62,30 +63,43 @@ rhi::PipelinePtr Engine::createFullscreenPipeline(const std::string& fsFile, std
 bool Engine::init(const EngineConfig& cfg) {
     cfg_ = cfg;
     if (!glfwInit()) { std::fprintf(stderr, "glfwInit failed\n"); return false; }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_DEPTH_BITS, 0);
-    glfwWindowHint(GLFW_STENCIL_BITS, 0);
+    bool useD3D11 = false;
+    if (cfg.backend == rhi::Backend::D3D11) {
+#if defined(GFX_HAS_D3D11)
+        useD3D11 = true;
+#else
+        std::fprintf(stderr, "[engine] D3D11 backend not built in this configuration (Windows only), using OpenGL\n");
+#endif
+    }
+    if (useD3D11) {
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);   // DXGI owns the swapchain
+    } else {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+        glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_DEPTH_BITS, 0);
+        glfwWindowHint(GLFW_STENCIL_BITS, 0);
+    }
     if (cfg.hidden) glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     window_ = glfwCreateWindow(int(cfg.width), int(cfg.height), "gfx-settings-lab", nullptr, nullptr);
-    if (!window_) { std::fprintf(stderr, "Could not create an OpenGL 4.5 core window\n"); return false; }
-    glfwMakeContextCurrent(window_);
-    if (!gladLoadGL(glfwGetProcAddress)) { std::fprintf(stderr, "gladLoadGL failed\n"); return false; }
+    if (!window_) { std::fprintf(stderr, "Could not create the window (%s)\n", useD3D11 ? "D3D11" : "OpenGL 4.5 core"); return false; }
     glfwSetWindowUserPointer(window_, this);
     glfwSetWindowFocusCallback(window_, [](GLFWwindow* w, int f) { static_cast<Engine*>(glfwGetWindowUserPointer(w))->focused_ = f != 0; });
 
-    if (cfg.backend == rhi::Backend::D3D11) {
 #if defined(GFX_HAS_D3D11)
-        std::fprintf(stderr, "[engine] D3D11 backend requested: see src/rhi/d3d11 (GL context used for this build)\n");
-#else
-        std::fprintf(stderr, "[engine] D3D11 backend not built in this configuration, using OpenGL\n");
-#endif
+    if (useD3D11) {
+        device_ = rhi::createD3D11Device(window_);
+        if (!device_) { std::fprintf(stderr, "[engine] D3D11 device creation failed\n"); return false; }
     }
-    device_ = rhi::createGLDevice(window_);
+#endif
+    if (!device_) {
+        glfwMakeContextCurrent(window_);
+        if (!gladLoadGL(glfwGetProcAddress)) { std::fprintf(stderr, "gladLoadGL failed\n"); return false; }
+        device_ = rhi::createGLDevice(window_);
+    }
     const auto& caps = device_->caps();
     std::printf("[engine] %s %s | %s | %s\n", caps.apiName.c_str(), caps.version.c_str(), caps.renderer.c_str(), caps.vendor.c_str());
 
@@ -496,6 +510,26 @@ void Engine::run() {
 }
 
 void Engine::runBenchmarkSweep() {
+    // Env overrides so a sweep fits on slow GPUs (llvmpipe):
+    //   GFX_BENCH_FILTER=textures.,shadows.   only ids starting with one of these prefixes
+    //   GFX_BENCH_WINDOW=30 GFX_BENCH_WARMUP=8 frames per measurement / ignored after each change
+    if (const char* e = std::getenv("GFX_BENCH_WINDOW")) Profiler::kWindow = std::max(5, std::atoi(e));
+    if (const char* e = std::getenv("GFX_BENCH_WARMUP")) Profiler::kWarmup = std::max(0, std::atoi(e));
+    std::vector<std::string> filter;
+    if (const char* e = std::getenv("GFX_BENCH_FILTER")) {
+        std::string f = e;
+        for (size_t a = 0; a <= f.size();) {
+            size_t b = f.find(',', a);
+            if (b == std::string::npos) b = f.size();
+            if (b > a) filter.push_back(f.substr(a, b - a));
+            a = b + 1;
+        }
+    }
+    auto selected = [&](const std::string& id) {
+        if (filter.empty()) return true;
+        for (auto& p : filter) if (id.rfind(p, 0) == 0) return true;
+        return false;
+    };
     auto runFrames = [&](int n) { for (int i = 0; i < n && !glfwWindowShouldClose(window_); ++i) frame(); };
     auto window = [&]() { runFrames(Profiler::kWarmup); runFrames(Profiler::kWindow); return profiler_.average(Profiler::kWindow); };
     settings_.set("display.vsync", 0);
@@ -508,7 +542,7 @@ void Engine::runBenchmarkSweep() {
     for (auto& s : settings_.all()) {
         if (s.desc.flags & (SettingRequiresRestart | SettingDebug)) continue;
         if (s.desc.category == "Display" && (s.desc.id == "display.windowMode" || s.desc.id == "display.resolution" || s.desc.id == "display.vsync" || s.desc.id == "display.frameCap")) continue;
-        if (s.desc.id == "scene.select") continue;
+        if (s.desc.id == "scene.select" || !selected(s.desc.id)) continue;
         std::vector<float> values;
         switch (s.type) {
             case SettingType::Bool: values = {0, 1}; break;

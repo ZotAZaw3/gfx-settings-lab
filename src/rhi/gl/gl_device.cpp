@@ -307,8 +307,10 @@ public:
         indexType_ = type == IndexType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
         indexOffset_ = offset;
         indexBuffer_ = static_cast<GLBuffer*>(b)->id;
-        if (pipeline_) glVertexArrayElementBuffer(pipeline_->vao, indexBuffer_);
+        // Attach to whichever VAO is bound (the shared empty VAO for vertex-pulling pipelines).
+        if (boundVao_) glVertexArrayElementBuffer(boundVao_, indexBuffer_);
     }
+    GLuint boundVao_ = 0;
 
     void draw(uint32_t vc, uint32_t ic, uint32_t fv, uint32_t fi) override {
         glDrawArraysInstancedBaseInstance(topology_, fv, vc, ic, fi);
@@ -772,8 +774,9 @@ void GLCommandList::bindPipeline(Pipeline* p) {
     const auto& d = gp->desc();
     pipeline_ = gp;
     glUseProgram(d.program ? static_cast<GLProgram*>(d.program)->id : 0);
-    glBindVertexArray(d.layout.attribs.empty() ? dev_.emptyVao_ : gp->vao);
-    if (!d.layout.attribs.empty() && indexBuffer_) glVertexArrayElementBuffer(gp->vao, indexBuffer_);
+    boundVao_ = d.layout.attribs.empty() ? dev_.emptyVao_ : gp->vao;
+    glBindVertexArray(boundVao_);
+    if (indexBuffer_) glVertexArrayElementBuffer(boundVao_, indexBuffer_);
     topology_ = glTopology(d.topology);
     if (d.topology == Topology::Patches) glPatchParameteri(GL_PATCH_VERTICES, GLint(d.patchControlPoints));
 

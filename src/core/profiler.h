@@ -91,8 +91,8 @@ public:
     std::vector<SweepResult> sweepResults;
     void writeSweepReport(const std::string& dir, const rhi::Caps& caps) const;
 
-    static constexpr int kWindow = 60;       // frames per measurement window
-    static constexpr int kWarmup = 15;       // frames ignored after a change (shader compile, RT realloc)
+    static inline int kWindow = 60;   // GFX_BENCH_WINDOW overrides for sweeps       // frames per measurement window
+    static inline int kWarmup = 15;   // GFX_BENCH_WARMUP overrides for sweeps       // frames ignored after a change (shader compile, RT realloc)
 
 private:
     struct PassData {

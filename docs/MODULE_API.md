@@ -37,6 +37,17 @@ Shader rules that keep the D3D11 cross-compile working:
   GL-only built-ins beyond `gl_VertexID`, `gl_InstanceID`, `gl_FragCoord`, `gl_GlobalInvocationID`
   and friends.
 
+D3D11 backend status (`src/rhi/d3d11/d3d11_device.cpp`, built on Windows by default, `-DGFX_D3D11=ON`):
+- Same GLSL, cross-compiled at load and on hot reload; DXBC cached in `shader_cache/` like GL binaries.
+- Registers: UBO N → `bN`, sampler N → `tN`/`sN`, read-only SSBO N → `t(16+N)`, writable SSBO N →
+  `u(8+N)`, image N → `uN` (so keep images in 0–7). Mark read-only SSBOs `readonly` in GLSL.
+- **No tessellation or geometry shaders** (`caps().tessellation == false`). Check the cap and fall
+  back (e.g. pre-tessellated LOD mesh or displacement in the vertex shader). Patch pipelines draw as
+  plain triangles.
+- Pixel-shader UAVs start after the bound render targets.
+- HDR10 / scRGB via `IDXGISwapChain3::SetColorSpace1`; tearing (vsync off) uses `DXGI_PRESENT_ALLOW_TEARING`;
+  VRAM figures come from `IDXGIAdapter3::QueryVideoMemoryInfo`.
+
 ## 2. Folder ownership
 
 ```
@@ -284,7 +295,11 @@ Automatic, no work needed:
   skipped) and stores Δ GPU ms, Δ CPU ms, Δ frame ms, Δ VRAM MB, Δ RAM MB on that setting. The
   menu shows it inline.
 - `gfxlab --bench-settings docs/_measurements` sweeps every value of every setting (from the High
-  preset baseline) and writes `docs/_measurements/<gpu>.md` and `.csv`.
+  preset baseline) and writes `docs/_measurements/<gpu>.md` and `.csv`. On slow GPUs narrow it:
+  `GFX_BENCH_FILTER=shadows.,lighting.ao GFX_BENCH_WINDOW=30 GFX_BENCH_WARMUP=8 gfxlab --bench-settings ...`
+  (comma-separated id prefixes; frames per window; frames skipped after each change).
+- `python3 tools/fill_bench_tables.py docs/_measurements/<gpu>.csv docs` fills every
+  `<!-- bench: id1,id2 -->...<!-- /bench -->` block in the docs from that CSV.
 
 Optional:
 - `GFX_CPU_SCOPE(ctx.profiler, "BVH build");` for sub-pass CPU timing.

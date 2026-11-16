@@ -1,0 +1,41 @@
+#version 450
+// RT global illumination (diffuse, 1 traced bounce + infinite bounce via last frame's GI). docs/raytracing_gi.md
+layout(local_size_x = 8, local_size_y = 8) in;
+#include "raytracing/rt_common.glsl"
+#include "raytracing/rt_gbuffer.glsl"
+layout(binding = 0, rgba16f) uniform writeonly image2D uOut; // rgb irradiance (albedo demodulated), a hit distance
+layout(binding = 4) uniform sampler2D uPrevGI;               // last frame's denoised GI (trace res)
+
+vec3 prevGIAt(vec3 worldPos) {
+    vec4 c = prevViewProj * vec4(worldPos, 1.0);
+    if (c.w <= 0.0) return skyZenith.rgb * 0.3;
+    vec2 ndc = c.xy / c.w;
+    vec2 uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return skyZenith.rgb * 0.3;
+    return textureLod(uPrevGI, uv, 0.0).rgb;
+}
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(px, sizes.xy))) return;
+    GSample g = loadG(fullTexel(px));
+    if (!g.valid) { imageStore(uOut, px, vec4(0.0)); return; }
+    Rng rng = rngInit(uvec2(px), uint(frameInfo.x), 4u);
+    int rays = max(frameInfo.y, 1);
+    bool multiBounce = frameInfo.z > 1 && (frameInfo.w & RT_FLAG_HISTORY_VALID) != 0;
+    vec3 o = offsetOrigin(g.pos, g.n);
+    vec3 sum = vec3(0.0);
+    float hd = 0.0;
+    for (int i = 0; i < rays; ++i) {
+        vec3 d = sampleCosineHemisphere(g.n, rand2(rng));
+        Hit h;
+        if (!traceClosest(o, d, effectParams.z, h)) { sum += skyRadiance(d); hd += effectParams.z; continue; }
+        hd += h.t;
+        Surface s = surfaceAt(o, d, h);
+        vec3 Lo = s.emissive + shadeSunAt(s, -d, rng);
+        if (multiBounce) Lo += s.albedo * (1.0 - s.metallic) * prevGIAt(s.pos);
+        // cosine-weighted pdf cancels the cosine and 1/pi: irradiance/pi estimate == Lo
+        sum += Lo;
+    }
+    imageStore(uOut, px, vec4(sum / float(rays), hd / float(rays)));
+}

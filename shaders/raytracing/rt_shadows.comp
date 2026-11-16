@@ -1,0 +1,23 @@
+#version 450
+// RT shadows: sun visibility via cone-sampled occlusion rays. docs/raytracing_shadows.md
+layout(local_size_x = 8, local_size_y = 8) in;
+#include "raytracing/rt_common.glsl"
+#include "raytracing/rt_gbuffer.glsl"
+layout(binding = 0, r16f) uniform writeonly image2D uOut; // visibility, 1 = lit
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(px, sizes.xy))) return;
+    GSample g = loadG(fullTexel(px));
+    if (!g.valid) { imageStore(uOut, px, vec4(1.0)); return; }
+    if (dot(g.n, sunDir.xyz) <= 0.0) { imageStore(uOut, px, vec4(0.0)); return; } // back-facing: no ray
+    Rng rng = rngInit(uvec2(px), uint(frameInfo.x), 1u);
+    int rays = max(frameInfo.y, 1);
+    float vis = 0.0;
+    vec3 o = offsetOrigin(g.pos, g.n);
+    for (int i = 0; i < rays; ++i) {
+        vec3 L = sampleCone(sunDir.xyz, sunDir.w, rand2(rng));
+        vis += traceAny(o, L, effectParams.z) ? 0.0 : 1.0;
+    }
+    imageStore(uOut, px, vec4(vis / float(rays)));
+}

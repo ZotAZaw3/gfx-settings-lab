@@ -1,0 +1,18 @@
+#version 450
+// For the AA thread's Ray Reconstruction modes: exports the noisy lit image demodulated by albedo
+// ("rt.noisy") plus the albedo used ("rt.albedo"). docs/denoising.md, docs/ray_reconstruction.md
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D uSceneColor;
+layout(binding = 1) uniform sampler2D uAlbedoSrc;   // gbuffer.albedo, or the path tracer's primary albedo
+layout(binding = 0, rgba16f) uniform writeonly image2D uNoisy;
+layout(binding = 1, rgba16f) uniform writeonly image2D uAlbedoOut;
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(uNoisy);
+    if (any(greaterThanEqual(px, size))) return;
+    vec2 uv = (vec2(px) + 0.5) / vec2(size);
+    vec3 albedo = max(textureLod(uAlbedoSrc, uv, 0.0).rgb, vec3(0.02));
+    vec3 c = texelFetch(uSceneColor, px, 0).rgb;
+    imageStore(uNoisy, px, vec4(c / albedo, 1.0));
+    imageStore(uAlbedoOut, px, vec4(albedo, 1.0));
+}

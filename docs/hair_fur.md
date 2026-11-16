@@ -60,6 +60,21 @@ bends outer shells more. Cheap and convincing for short fur and grass-like carpe
 - Shells: fewer shells far away; use fins at silhouettes.
 - Use TAA to resolve sub-pixel strand aliasing instead of heavy per-strand AA.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers. This feature sits on the plaza, which is small or off-screen from that camera, so these rows are mostly noise; set `world.showcaseCamera` to the plaza or close-up view before benchmarking it on real hardware.
+
+<!-- bench: characters.furQuality -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Fur Quality | Off | -6.990 | +2.486 | +2.502 | +0.0 | +0.0 |
+| Fur Quality | Low | +20.024 | +24.795 | +24.794 | +0.0 | +0.0 |
+| Fur Quality | Medium | +47.003 | +49.909 | +49.938 | +0.0 | +0.0 |
+| Fur Quality | High | +24.843 | +22.930 | +22.943 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch, shell fur)
 
 ```glsl

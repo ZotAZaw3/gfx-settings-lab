@@ -78,6 +78,25 @@ Costs:
   **Nanite-style** pre-tessellated clusters, which avoid the fixed-function bottleneck.
 - Distance fade the displacement strength to 0 so far patches can stay at level 1.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: geometry.tessellation world.terrainDisplacement -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Tessellation | Off | +7.859 | +4.616 | +4.641 | +0.0 | +0.1 |
+| Tessellation | Low | -20.230 | -17.945 | -17.947 | +0.0 | +0.1 |
+| Tessellation | Medium | -10.828 | -6.000 | -5.998 | +0.0 | +0.1 |
+| Tessellation | High | +11.243 | +11.762 | +11.776 | +0.0 | +0.1 |
+| Tessellation | Ultra | +29.951 | +33.684 | +33.691 | +0.0 | +0.1 |
+| Displacement Strength | 0.00 | -8.880 | -7.330 | -7.340 | +0.0 | +0.0 |
+| Displacement Strength | 1.00 | -5.408 | -7.516 | -7.528 | +0.0 | +0.0 |
+| Displacement Strength | 1.00 | -40.318 | -44.800 | -44.835 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

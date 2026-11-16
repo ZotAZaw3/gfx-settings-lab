@@ -61,6 +61,23 @@ colour copy; reflections are the big one).
 - Fade wave detail and tessellation with distance.
 - Reuse SSR; fall back to a reflection probe on Low.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: world.waterQuality world.caustics -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Water Quality | Low | +8.190 | +5.114 | +5.125 | +0.0 | +0.0 |
+| Water Quality | Medium | +14.275 | +15.228 | +15.221 | +0.0 | +0.0 |
+| Water Quality | High | +31.933 | +36.188 | +36.174 | +0.0 | +0.0 |
+| Water Quality | Ultra | +29.438 | +23.131 | +23.115 | +0.0 | +0.0 |
+| Caustics | Off | -2.749 | +3.154 | +3.158 | +0.0 | +0.0 |
+| Caustics | On | -12.027 | -10.337 | -10.284 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch, Gerstner)
 
 ```glsl

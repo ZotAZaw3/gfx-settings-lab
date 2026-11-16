@@ -70,6 +70,26 @@ players often run effects on Low even with a strong GPU (also better visibility)
 - Pool and recycle emitters; avoid per-frame allocation.
 - Merge distortion into the post-process chain so no extra copy is needed.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: effects.vfxQuality effects.resolution effects.flipbookBlend -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Effects Quality | Low | -232.756 | -244.983 | -244.993 | -5.2 | -6.0 |
+| Effects Quality | Medium | -195.132 | -199.957 | -199.970 | -3.8 | -6.0 |
+| Effects Quality | High | -44.983 | -50.178 | -50.218 | +0.0 | -0.8 |
+| Effects Quality | Ultra | +437.470 | +456.868 | +456.856 | +18.0 | +117.5 |
+| Effects Resolution | Full | -6.247 | -8.623 | -8.656 | +0.0 | +0.0 |
+| Effects Resolution | Half | -21.966 | -25.973 | -25.984 | -1.1 | +0.0 |
+| Effects Resolution | Quarter | -31.391 | -36.576 | -36.606 | -1.6 | +0.0 |
+| Flipbook Interpolation | Off | -19.111 | -22.865 | -22.881 | +0.0 | +0.0 |
+| Flipbook Interpolation | On | -20.240 | -24.081 | -24.096 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```cpp

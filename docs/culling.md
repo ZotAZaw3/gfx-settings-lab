@@ -76,6 +76,24 @@ fewer shadow casters). Shadow maps need their own culling from the light's frust
 - Cull per cluster (meshlets) for big meshes, not just per object.
 - Separate culling per shadow cascade, and skip casters whose shadow can't reach the view.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: performance.frustumCulling performance.occlusionCulling performance.smallObjectCulling -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Frustum Culling | Off | +1.277 | +4.046 | +4.047 | +0.1 | +0.0 |
+| Frustum Culling | On | +11.366 | +11.618 | +11.647 | +0.0 | +0.0 |
+| Occlusion Culling | Off | +12.019 | +16.944 | +16.926 | +0.0 | +0.0 |
+| Occlusion Culling | On | +32.334 | +33.754 | +33.732 | +0.0 | +0.0 |
+| Small Object Culling | 0.0 px | -14.482 | -7.293 | -7.304 | +0.0 | +0.0 |
+| Small Object Culling | 1.0 px | +7.671 | +7.255 | +7.274 | +0.0 | +0.0 |
+| Small Object Culling | 8.0 px | +13.590 | +12.861 | +12.862 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```cpp

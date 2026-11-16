@@ -82,6 +82,30 @@ Costs:
   (bounding box test).
 - Indirect draw: compute writes alive count into a `DrawArraysIndirectCommand`.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: effects.particleQuality effects.spawnScale effects.particleLighting effects.softParticles effects.particleCollision -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Particle Quality | Low | -186.716 | -174.052 | -173.995 | -5.2 | +0.0 |
+| Particle Quality | Medium | -129.425 | -103.135 | -103.134 | -3.8 | +0.0 |
+| Particle Quality | High | -2.393 | +20.421 | +20.413 | +0.0 | +0.0 |
+| Particle Quality | Ultra | +463.702 | +487.633 | +487.649 | +18.0 | +35.8 |
+| Spawn Rate | 0.10 | -197.565 | -188.267 | -188.279 | +0.0 | +0.0 |
+| Spawn Rate | 1.00 | -20.415 | +10.563 | +10.570 | +0.0 | +0.0 |
+| Spawn Rate | 1.00 | -0.779 | +6.483 | +6.480 | +0.0 | +0.0 |
+| Particle Lighting | Unlit | +9.575 | +7.260 | +7.256 | +0.0 | +0.0 |
+| Particle Lighting | Lit | +20.655 | +3.504 | +3.514 | +0.0 | +0.0 |
+| Soft Particles | Off | -1.998 | +7.714 | +7.713 | +0.0 | +0.0 |
+| Soft Particles | On | +22.034 | +29.173 | +29.173 | +0.0 | +0.0 |
+| Particle Collision | Off | -23.556 | -20.600 | -20.611 | +0.0 | +0.0 |
+| Particle Collision | On | -13.839 | -14.927 | -14.909 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

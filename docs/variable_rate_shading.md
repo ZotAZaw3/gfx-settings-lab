@@ -70,6 +70,21 @@ detail in coarse tiles, most visible on high-frequency textures in motion.
   **software VRS**: shade one pixel per 2×2 in the lighting compute shader for tiles the
   rate image marks as coarse, then broadcast.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: performance.vrs -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Variable Rate Shading | Off | -11.433 | -13.737 | -13.662 | +0.0 | +0.0 |
+| Variable Rate Shading | Quality | +4.055 | +2.208 | +2.202 | +0.0 | +0.3 |
+| Variable Rate Shading | Balanced | -4.749 | -4.957 | -4.981 | +0.0 | +0.3 |
+| Variable Rate Shading | Performance | -18.409 | -25.016 | -25.027 | +0.0 | +0.3 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 Shading rate image generation:

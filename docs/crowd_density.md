@@ -49,6 +49,21 @@ imbalanced CPUs). GPU: vertex skinning + overdraw; shadows of all those characte
 - Despawn behind the player; spawn just outside view.
 - Share animation poses between similar agents (pose caching).
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers. This feature sits on the plaza, which is small or off-screen from that camera, so these rows are mostly noise; set `world.showcaseCamera` to the plaza or close-up view before benchmarking it on real hardware.
+
+<!-- bench: world.crowdDensity -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Crowd Density | Low | -8.384 | -3.915 | -3.921 | +0.0 | +0.0 |
+| Crowd Density | Medium | -3.804 | -5.089 | -5.092 | +0.0 | +0.0 |
+| Crowd Density | High | -7.542 | -5.432 | -5.448 | +0.0 | +0.0 |
+| Crowd Density | Ultra | +1.824 | -4.780 | -4.794 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 The prototype uses simple instanced capsules walking on circles:

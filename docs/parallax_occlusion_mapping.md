@@ -73,6 +73,24 @@ or CPU cost, so it scales with resolution (and benefits a lot from upscaling).
   other geometry; it disables early-Z, so avoid if possible.
 - Use cone step mapping / precomputed distance fields for big speedups on deep surfaces.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: geometry.pom geometry.pomDepth -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Parallax Occlusion Mapping | Off | +20.889 | +11.994 | +12.054 | +0.0 | +0.0 |
+| Parallax Occlusion Mapping | Low | -3.755 | -8.305 | -8.319 | +0.0 | +0.0 |
+| Parallax Occlusion Mapping | Medium | +13.195 | +7.811 | +7.835 | +0.0 | +0.0 |
+| Parallax Occlusion Mapping | High | +15.392 | +8.273 | +8.274 | +0.0 | +0.0 |
+| POM Depth | 0.00 | +10.909 | +2.759 | +2.752 | +0.0 | +0.0 |
+| POM Depth | 0.06 | +2.233 | -3.947 | -3.973 | +0.0 | +0.0 |
+| POM Depth | 0.15 | +7.414 | +0.597 | +0.613 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

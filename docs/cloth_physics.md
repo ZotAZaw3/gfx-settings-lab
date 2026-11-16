@@ -63,6 +63,23 @@ for the chunks.
 - Debris: put to sleep quickly, fade out after the lifetime, convert tiny pieces to
   particles.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers. This feature sits on the plaza, which is small or off-screen from that camera, so these rows are mostly noise; set `world.showcaseCamera` to the plaza or close-up view before benchmarking it on real hardware.
+
+<!-- bench: physics.cloth physics.windStrength -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Cloth Simulation | Off | +24.338 | +22.153 | +22.159 | -0.1 | +0.0 |
+| Cloth Simulation | Low | +0.883 | -13.927 | -13.923 | -0.1 | +0.0 |
+| Cloth Simulation | High | -31.513 | -31.346 | -31.253 | +0.0 | +0.0 |
+| Wind Strength | 0.00 | +37.792 | +38.104 | +38.113 | +0.0 | +0.0 |
+| Wind Strength | 6.00 | +37.010 | +21.647 | +21.654 | +0.0 | +3.2 |
+| Wind Strength | 20.00 | +25.870 | +23.233 | +23.226 | +0.0 | +3.2 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

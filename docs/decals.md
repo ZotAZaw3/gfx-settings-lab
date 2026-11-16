@@ -67,6 +67,28 @@ holes) multiply overdraw. CPU cost is tiny with instancing.
 - Distance-cull decals aggressively; fade small ones first.
 - Use a stencil bit to stop decals from drawing onto characters / dynamic objects.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers. This feature sits on the plaza, which is small or off-screen from that camera, so these rows are mostly noise; set `world.showcaseCamera` to the plaza or close-up view before benchmarking it on real hardware.
+
+<!-- bench: effects.decalQuality effects.maxDecals effects.decalLifetime -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Decal Quality | Low | -5.263 | -8.041 | -8.033 | +0.0 | +1.5 |
+| Decal Quality | Medium | +7.042 | -1.767 | -1.725 | +0.0 | +1.5 |
+| Decal Quality | High | +12.881 | +16.631 | +16.633 | +0.0 | +1.5 |
+| Max Decals | 16 | +5.409 | +8.307 | +8.315 | +0.0 | +0.0 |
+| Max Decals | 524 | -13.163 | -13.356 | -13.384 | +0.0 | +0.0 |
+| Max Decals | 1032 | -14.680 | -12.862 | -12.868 | +0.0 | +0.0 |
+| Max Decals | 1540 | -12.290 | -11.748 | -11.736 | +0.0 | +0.0 |
+| Max Decals | 2048 | +2.374 | -1.322 | -1.337 | +0.0 | +0.0 |
+| Decal Lifetime | 5 s | -15.863 | -15.505 | -15.519 | +0.0 | +0.0 |
+| Decal Lifetime | 30 s | -13.425 | -10.157 | -10.196 | +0.0 | +0.0 |
+| Decal Lifetime | 120 s | -18.943 | -19.223 | -19.235 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

@@ -71,6 +71,28 @@ draw-call submission scales with visible object count.
 - Hysteresis + dithering stops visible popping without costly alpha blending.
 - Stream far-away LODs only; load LOD0 when the object comes within range.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: geometry.lodBias geometry.lodHysteresis geometry.drawDistance -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| LOD Bias | -2 | +165.693 | +163.335 | +163.361 | +0.0 | +0.0 |
+| LOD Bias | -1 | +64.009 | +54.124 | +54.117 | +0.0 | +0.0 |
+| LOD Bias | 0 | -15.354 | -22.518 | -22.491 | +0.0 | +0.0 |
+| LOD Bias | 1 | -45.435 | -55.294 | -55.275 | +0.0 | +0.0 |
+| LOD Bias | 2 | -34.192 | -30.741 | -30.731 | +0.0 | +0.0 |
+| LOD Bias | 3 | -26.991 | -35.551 | -35.547 | +0.0 | +0.0 |
+| LOD Hysteresis | Off | -0.230 | +2.748 | +2.778 | +0.0 | +0.0 |
+| LOD Hysteresis | On | -19.399 | -21.979 | -21.925 | +0.0 | +0.0 |
+| Draw Distance | 50 m | -1.714 | -10.212 | -10.198 | +0.0 | +0.0 |
+| Draw Distance | 600 m | +12.856 | +9.079 | +9.077 | +0.0 | +0.0 |
+| Draw Distance | 2000 m | +6.851 | +9.447 | +9.455 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```cpp

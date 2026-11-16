@@ -70,6 +70,31 @@ Costs:
 - Tie grass density to the upscaler: at low internal resolution, thin blades alias,
   so slightly wider blades look better.
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: world.grassDensity world.foliageQuality world.foliageDistance world.foliageWind world.grassInteraction -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Grass Density | 0.00 | +10.407 | +3.653 | +3.648 | +0.0 | +0.0 |
+| Grass Density | 0.75 | +5.276 | +2.919 | +2.910 | +0.0 | +0.0 |
+| Grass Density | 1.00 | +13.232 | +8.502 | +8.481 | +0.0 | +0.0 |
+| Foliage Quality | Low | +2.623 | +4.974 | +4.946 | +0.0 | +0.0 |
+| Foliage Quality | Medium | +5.594 | +9.025 | +9.013 | +0.0 | +0.0 |
+| Foliage Quality | High | +6.932 | +10.637 | +10.648 | +0.0 | +0.0 |
+| Foliage Quality | Ultra | +26.963 | +27.851 | +27.889 | +0.0 | +0.0 |
+| Foliage Draw Distance | 20 m | -17.606 | -16.424 | -16.439 | +0.0 | +0.0 |
+| Foliage Draw Distance | 120 m | -7.237 | -14.930 | -14.949 | +0.0 | +0.0 |
+| Foliage Draw Distance | 300 m | -4.525 | -0.436 | -0.433 | +0.0 | +0.0 |
+| Wind Animation | Off | +17.815 | +10.820 | +10.794 | +0.0 | +0.0 |
+| Wind Animation | On | +19.035 | +16.734 | +16.706 | +0.0 | +0.0 |
+| Grass Interaction | Off | +3.785 | +9.805 | +9.807 | +0.0 | +0.0 |
+| Grass Interaction | On | -7.204 | -6.004 | -5.986 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 ```glsl

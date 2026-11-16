@@ -84,6 +84,32 @@ for big fps" settings in modern games.
 - Amortize clouds over several frames (checkerboard / 4×4 reprojection).
 - Share the shadow lookup with the god-ray effect (owned by the post-processing thread).
 
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: effects.volumetricFog effects.fogDensity effects.volumetricClouds effects.cloudCoverage -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Volumetric Fog | Off | -32.296 | -32.964 | -33.014 | -0.5 | +0.0 |
+| Volumetric Fog | Low | -30.960 | -23.502 | -23.555 | -0.5 | +0.0 |
+| Volumetric Fog | Medium | -5.962 | +3.358 | +3.314 | +0.0 | +0.0 |
+| Volumetric Fog | High | -9.993 | -4.228 | -4.272 | +0.0 | +0.0 |
+| Volumetric Fog | Ultra | +127.067 | +131.226 | +131.171 | +1.1 | +0.1 |
+| Fog Density | 0.000 | -16.892 | -11.404 | -11.450 | +0.0 | +0.0 |
+| Fog Density | 0.012 | -30.953 | -29.403 | -29.459 | +0.0 | +0.0 |
+| Fog Density | 0.100 | -40.530 | -35.111 | -35.182 | +0.0 | +0.0 |
+| Volumetric Clouds | Off | +7.842 | +2.230 | +2.252 | +0.0 | +0.0 |
+| Volumetric Clouds | Low | +9.780 | +7.107 | +7.142 | +0.0 | +0.0 |
+| Volumetric Clouds | Medium | +9.935 | +3.766 | +3.900 | +0.0 | +0.0 |
+| Volumetric Clouds | High | +17.466 | +16.420 | +16.439 | +0.0 | +0.0 |
+| Cloud Coverage | 0.00 | -27.782 | -18.616 | -18.589 | +0.0 | +0.0 |
+| Cloud Coverage | 0.50 | -0.863 | +7.881 | +7.865 | +0.0 | +0.0 |
+| Cloud Coverage | 1.00 | +10.932 | +17.640 | +17.637 | +0.0 | +0.0 |
+<!-- /bench -->
+
 ## Rebuild (from scratch)
 
 Fullscreen pass after the opaque scene, reading the depth buffer:

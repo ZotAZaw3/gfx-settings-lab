@@ -84,9 +84,23 @@ Code: `shaders/raytracing/rt_shadows.comp` → denoiser → `lighting.sunVisibil
 Shared code: `src/modules/raytracing/bvh.cpp` (BVH), `shaders/raytracing/rt_common.glsl` (traversal, sampling),
 `rt_gbuffer.glsl` (G-buffer reads).
 
-Measured cost (Δ GPU ms / Δ CPU ms / Δ VRAM / Δ RAM per value at 1920×1080) is filled in from
-`gfxlab --bench-settings` once the app builds; cloud numbers come from Mesa llvmpipe (software)
-and only show relative cost.
+### Measured cost
+
+Measured with `gfxlab --bench-settings` on **Mesa llvmpipe 25.2 (software rasterizer, LLVM 20, 256-bit)**, 640×360, procedural demo scene, High preset baseline (RT AO and RT reflections on, RT resolution 0.75). Each value is the 60-frame average after the change minus the one before it. On llvmpipe the "GPU" is the CPU, so GPU and CPU ms move together, and run-to-run noise is about ±3 ms. Treat these as **relative** costs; a real GPU is 10-100x faster.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB |
+|---|---|---|---|---|
+| `rt.shadows` | Off | +0.7 | +1.2 | +0.0 |
+| `rt.shadows` | On | +19.6 | +19.2 | +11.4 |
+| `rt.shadows.rays` | 1 | +0.2 | +1.2 | +0.0 |
+| `rt.shadows.rays` | 2 | -2.7 | -2.2 | +0.0 |
+| `rt.shadows.rays` | 3 | -2.4 | -1.6 | +0.0 |
+| `rt.shadows.rays` | 4 | -1.9 | -1.7 | +0.0 |
+| `rt.shadows.sun_radius` | 0.00 | -2.1 | -1.2 | +0.0 |
+| `rt.shadows.sun_radius` | 0.50 | +1.6 | +2.9 | +0.0 |
+| `rt.shadows.sun_radius` | 3.00 | -0.2 | -0.1 | +0.0 |
+
+Turning RT shadows on costs ~19.6 ms and 11.4 MB here (trace + denoise at 0.75 scale). Rays per pixel and sun size are within noise because the demo scene's occlusion rays are short and terminate early.
 
 ## Rebuild (from scratch)
 

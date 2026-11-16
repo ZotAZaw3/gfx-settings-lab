@@ -136,9 +136,25 @@ Code: `shaders/raytracing/rt_denoise_temporal.comp`, `rt_denoise_atrous.comp`; d
 Shared code: `src/modules/raytracing/bvh.cpp` (BVH), `shaders/raytracing/rt_common.glsl` (traversal, sampling),
 `rt_gbuffer.glsl` (G-buffer reads).
 
-Measured cost (Δ GPU ms / Δ CPU ms / Δ VRAM / Δ RAM per value at 1920×1080) is filled in from
-`gfxlab --bench-settings` once the app builds; cloud numbers come from Mesa llvmpipe (software)
-and only show relative cost.
+### Measured cost
+
+Measured with `gfxlab --bench-settings` on **Mesa llvmpipe 25.2 (software rasterizer, LLVM 20, 256-bit)**, 640×360, procedural demo scene, High preset baseline (RT AO and RT reflections on, RT resolution 0.75). Each value is the 60-frame average after the change minus the one before it. On llvmpipe the "GPU" is the CPU, so GPU and CPU ms move together, and run-to-run noise is about ±3 ms. Treat these as **relative** costs; a real GPU is 10-100x faster.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB |
+|---|---|---|---|---|
+| `rt.denoiser` | Off | -28.2 | -28.3 | +0.0 |
+| `rt.denoiser` | Temporal Only | -22.7 | -22.4 | +0.0 |
+| `rt.denoiser` | SVGF | +1.1 | +2.0 | +0.0 |
+| `rt.denoiser.temporal_alpha` | 0.01 | -0.4 | -0.4 | +0.0 |
+| `rt.denoiser.temporal_alpha` | 0.05 | -1.3 | -0.8 | +0.0 |
+| `rt.denoiser.temporal_alpha` | 0.50 | -0.4 | -0.2 | +0.0 |
+| `rt.denoiser.atrous_iterations` | 1 | -19.3 | -18.6 | +0.0 |
+| `rt.denoiser.atrous_iterations` | 2 | -13.2 | -12.8 | +0.0 |
+| `rt.denoiser.atrous_iterations` | 3 | -8.9 | -8.5 | +0.0 |
+| `rt.denoiser.atrous_iterations` | 4 | -0.9 | -0.3 | +0.0 |
+| `rt.denoiser.atrous_iterations` | 5 | +3.5 | +4.4 | +0.0 |
+
+With RT AO and reflections on, the SVGF denoiser costs ~28 ms in total, and temporal-only costs ~5 ms. The à-trous filter is the expensive part on this software renderer because each of its 25 taps re-reads four G-buffer textures. The obvious next optimization is to pack depth and normal into one trace-resolution texture, read once per tap.
 
 ## Rebuild (from scratch)
 

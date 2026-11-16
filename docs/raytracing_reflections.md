@@ -68,9 +68,23 @@ Code: `shaders/raytracing/rt_reflections.comp` → denoiser → `lighting.indire
 Shared code: `src/modules/raytracing/bvh.cpp` (BVH), `shaders/raytracing/rt_common.glsl` (traversal, sampling),
 `rt_gbuffer.glsl` (G-buffer reads).
 
-Measured cost (Δ GPU ms / Δ CPU ms / Δ VRAM / Δ RAM per value at 1920×1080) is filled in from
-`gfxlab --bench-settings` once the app builds; cloud numbers come from Mesa llvmpipe (software)
-and only show relative cost.
+### Measured cost
+
+Measured with `gfxlab --bench-settings` on **Mesa llvmpipe 25.2 (software rasterizer, LLVM 20, 256-bit)**, 640×360, procedural demo scene, High preset baseline (RT AO and RT reflections on, RT resolution 0.75). Each value is the 60-frame average after the change minus the one before it. On llvmpipe the "GPU" is the CPU, so GPU and CPU ms move together, and run-to-run noise is about ±3 ms. Treat these as **relative** costs; a real GPU is 10-100x faster.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB |
+|---|---|---|---|---|
+| `rt.reflections` | Off | -16.9 | -16.9 | -14.1 |
+| `rt.reflections` | On | +4.3 | +4.6 | +0.0 |
+| `rt.reflections.rays` | 1 | -0.6 | -1.0 | +0.0 |
+| `rt.reflections.rays` | 2 | -2.2 | -2.4 | +0.0 |
+| `rt.reflections.max_roughness` | 0.05 | +0.3 | -0.4 | +0.0 |
+| `rt.reflections.max_roughness` | 0.60 | +1.3 | +0.9 | +0.0 |
+| `rt.reflections.max_roughness` | 1.00 | -0.7 | -1.1 | +0.0 |
+| `rt.reflections.bounces` | 1 | -1.7 | -2.7 | +0.0 |
+| `rt.reflections.bounces` | 2 | -2.4 | -3.4 | +0.0 |
+
+RT reflections are in the baseline: turning them off saves ~16.9 ms and 14.1 MB.
 
 ## Rebuild (from scratch)
 

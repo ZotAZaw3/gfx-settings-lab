@@ -70,9 +70,21 @@ Code: `shaders/raytracing/rt_gi.comp` → denoiser → `lighting.indirectDiffuse
 Shared code: `src/modules/raytracing/bvh.cpp` (BVH), `shaders/raytracing/rt_common.glsl` (traversal, sampling),
 `rt_gbuffer.glsl` (G-buffer reads).
 
-Measured cost (Δ GPU ms / Δ CPU ms / Δ VRAM / Δ RAM per value at 1920×1080) is filled in from
-`gfxlab --bench-settings` once the app builds; cloud numbers come from Mesa llvmpipe (software)
-and only show relative cost.
+### Measured cost
+
+Measured with `gfxlab --bench-settings` on **Mesa llvmpipe 25.2 (software rasterizer, LLVM 20, 256-bit)**, 640×360, procedural demo scene, High preset baseline (RT AO and RT reflections on, RT resolution 0.75). Each value is the 60-frame average after the change minus the one before it. On llvmpipe the "GPU" is the CPU, so GPU and CPU ms move together, and run-to-run noise is about ±3 ms. Treat these as **relative** costs; a real GPU is 10-100x faster.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB |
+|---|---|---|---|---|
+| `rt.gi` | Off | -0.4 | +0.1 | +0.0 |
+| `rt.gi` | On | +3.2 | +3.2 | +4.6 |
+| `rt.gi.rays` | 1 | -1.1 | -0.7 | +0.0 |
+| `rt.gi.rays` | 2 | -0.2 | +0.5 | +0.0 |
+| `rt.gi.bounces` | 1 | +1.3 | +1.8 | +0.0 |
+| `rt.gi.bounces` | 2 | -1.0 | -1.4 | +0.0 |
+| `rt.gi.bounces` | 3 | +1.0 | +1.6 | +0.0 |
+
+Turning GI on shows only +3.2 ms because it also switches RT AO off (−17.5 ms), so RT GI itself costs about 20 ms here, a little more than the AO it replaces. Extra bounces are nearly free because they read last frame's GI instead of tracing more rays.
 
 ## Rebuild (from scratch)
 

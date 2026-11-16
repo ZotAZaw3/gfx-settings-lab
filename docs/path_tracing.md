@@ -101,9 +101,38 @@ Code: `shaders/raytracing/rt_pathtrace.comp` (sets `ctx.replaceLighting`) → op
 Shared code: `src/modules/raytracing/bvh.cpp` (BVH), `shaders/raytracing/rt_common.glsl` (traversal, sampling),
 `rt_gbuffer.glsl` (G-buffer reads).
 
-Measured cost (Δ GPU ms / Δ CPU ms / Δ VRAM / Δ RAM per value at 1920×1080) is filled in from
-`gfxlab --bench-settings` once the app builds; cloud numbers come from Mesa llvmpipe (software)
-and only show relative cost.
+### Measured cost
+
+Measured with `gfxlab --bench-settings` on **Mesa llvmpipe 25.2 (software rasterizer, LLVM 20, 256-bit)**, 640×360, procedural demo scene, High preset baseline (RT AO and RT reflections on, RT resolution 0.75). Each value is the 60-frame average after the change minus the one before it. On llvmpipe the "GPU" is the CPU, so GPU and CPU ms move together, and run-to-run noise is about ±3 ms. Treat these as **relative** costs; a real GPU is 10-100x faster.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB |
+|---|---|---|---|---|
+| `rt.pathtracing` | Off | +2.0 | +2.5 | +0.0 |
+| `rt.pathtracing` | On | +407.2 | +407.6 | -7.7 |
+| `rt.pathtracing.spp` | 1 | -0.4 | -0.3 | +0.0 |
+| `rt.pathtracing.spp` | 2 | -1.1 | -1.7 | +0.0 |
+| `rt.pathtracing.spp` | 3 | -0.3 | -0.3 | +0.0 |
+| `rt.pathtracing.spp` | 4 | +0.8 | +1.4 | +0.0 |
+| `rt.pathtracing.spp` | 5 | +2.0 | +2.4 | +0.0 |
+| `rt.pathtracing.spp` | 6 | +3.9 | +4.0 | +0.0 |
+| `rt.pathtracing.spp` | 7 | +2.3 | +2.3 | +0.0 |
+| `rt.pathtracing.spp` | 8 | +0.6 | +0.9 | +0.0 |
+| `rt.pathtracing.bounces` | 1 | -2.2 | -2.2 | +0.0 |
+| `rt.pathtracing.bounces` | 2 | -1.9 | -1.8 | +0.0 |
+| `rt.pathtracing.bounces` | 3 | -2.3 | -2.6 | +0.0 |
+| `rt.pathtracing.bounces` | 4 | -0.5 | -0.2 | +0.0 |
+| `rt.pathtracing.bounces` | 5 | +0.9 | +0.9 | +0.0 |
+| `rt.pathtracing.bounces` | 6 | +3.3 | +3.5 | +0.0 |
+| `rt.pathtracing.bounces` | 7 | -1.4 | -2.1 | +0.0 |
+| `rt.pathtracing.bounces` | 8 | -2.2 | -2.7 | +0.0 |
+| `rt.pathtracing.russian_roulette` | Off | +0.3 | -0.3 | +0.0 |
+| `rt.pathtracing.russian_roulette` | On | +5.1 | +5.0 | +0.0 |
+| `rt.pathtracing.accumulate` | Off | +0.5 | -0.2 | +0.0 |
+| `rt.pathtracing.accumulate` | On | -0.7 | -0.2 | +0.0 |
+| `rt.pathtracing.firefly_clamp` | Off | +1.1 | +0.2 | +0.0 |
+| `rt.pathtracing.firefly_clamp` | On | -3.3 | -3.7 | +0.0 |
+
+Path tracing on llvmpipe is ~407 ms/frame (about 2.5 fps) at 0.75 RT scale, which is why real-time path tracing needs RT hardware plus denoising and upscaling. The sub-settings were swept with path tracing **off** (baseline), so their rows are noise and only show the settings cost nothing while PT is disabled.
 
 ## Rebuild (from scratch)
 

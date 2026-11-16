@@ -5,7 +5,11 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <deque>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <unordered_map>
@@ -93,6 +97,7 @@ struct MemTracker {
     std::mutex mtx;
     std::map<std::string, size_t> perOwner;
     size_t tex = 0, buf = 0;
+    uint64_t texturesDestroyed = 0;   // GL reuses texture names: cached FBOs must be dropped when one dies
     void add(const std::string& owner, size_t bytes, bool isTex) {
         std::lock_guard<std::mutex> l(mtx);
         perOwner[owner] += bytes; (isTex ? tex : buf) += bytes;
@@ -144,7 +149,7 @@ public:
         gpuBytes_ *= std::max(1u, d.samples);
         mem_.add(desc_.owner, gpuBytes_, true);
     }
-    ~GLTexture() override { glDeleteTextures(1, &id); mem_.sub(desc_.owner, gpuBytes_, true); }
+    ~GLTexture() override { glDeleteTextures(1, &id); mem_.sub(desc_.owner, gpuBytes_, true); ++mem_.texturesDestroyed; }
     uintptr_t nativeHandle() const override { return id; }
     GLuint id = 0;
     GLenum target = GL_TEXTURE_2D;
@@ -380,6 +385,7 @@ private:
     GLuint indexBuffer_ = 0;
     bool inPass_ = false;
     bool readOnlyDepth_ = false;
+    uint64_t seenDestroyed_ = 0;
     std::unordered_map<std::string, GLuint> fboCache_;
 };
 
@@ -469,10 +475,43 @@ public:
     BufferPtr createBuffer(const BufferDesc& d, const void* data) override { return std::make_unique<GLBuffer>(d, data, mem_); }
     ProgramPtr createProgram(const ProgramDesc& d) override { return std::make_unique<GLProgram>(d); }
 
+    void setProgramCacheDir(const std::string& dir) override {
+        cacheDir_ = dir;
+        if (!dir.empty()) { std::error_code ec; std::filesystem::create_directories(dir, ec); }
+    }
+    ShaderCacheStats shaderCacheStats() const override { return cacheStats_; }
+
     bool rebuildProgram(Program* program, const ProgramSources& src) override {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        bool ok = rebuildProgramImpl(program, src);
+        cacheStats_.compileMs += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count();
+        return ok;
+    }
+
+    bool rebuildProgramImpl(Program* program, const ProgramSources& src) {
         auto* p = static_cast<GLProgram*>(program);
         std::string log;
+        // ---- shader cache: program binary keyed by sources + driver ----
+        std::string cacheFile;
+        if (!cacheDir_.empty()) {
+            size_t h = std::hash<std::string>{}(caps_.renderer + caps_.version + "|" + src.vs + "|" + src.tcs + "|" + src.tes + "|" + src.gs + "|" + src.fs + "|" + src.cs);
+            char name[32]; std::snprintf(name, sizeof(name), "%016zx.bin", h);
+            cacheFile = cacheDir_ + "/" + name;
+            std::ifstream in(cacheFile, std::ios::binary);
+            if (in) {
+                GLenum fmt = 0;
+                in.read(reinterpret_cast<char*>(&fmt), sizeof(fmt));
+                std::vector<char> bin((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                GLuint prog = glCreateProgram();
+                glProgramBinary(prog, fmt, bin.data(), GLsizei(bin.size()));
+                GLint status = 0; glGetProgramiv(prog, GL_LINK_STATUS, &status);
+                if (status) { p->setResult(prog, true, ""); ++cacheStats_.hits; return true; }
+                glDeleteProgram(prog);   // driver changed: fall through to compile
+            }
+            ++cacheStats_.misses;
+        }
         GLuint prog = glCreateProgram();
+        if (!cacheFile.empty()) glProgramParameteri(prog, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
         std::vector<GLuint> shaders;
         bool ok = true;
         auto stage = [&](const std::string& code, GLenum type, const char* label) {
@@ -508,6 +547,17 @@ public:
         for (GLuint s : shaders) { glDetachShader(prog, s); glDeleteShader(s); }
         if (!ok) glDeleteProgram(prog);
         else if (!p->desc().name.empty()) glObjectLabel(GL_PROGRAM, prog, -1, p->desc().name.c_str());
+        if (ok && !cacheFile.empty()) {
+            GLint len = 0; glGetProgramiv(prog, GL_PROGRAM_BINARY_LENGTH, &len);
+            if (len > 0) {
+                std::vector<char> bin(static_cast<size_t>(len)); GLenum fmt = 0;
+                glGetProgramBinary(prog, len, nullptr, &fmt, bin.data());
+                std::ofstream out(cacheFile, std::ios::binary);
+                out.write(reinterpret_cast<const char*>(&fmt), sizeof(fmt));
+                out.write(bin.data(), len);
+                ++cacheStats_.stores;
+            }
+        }
         p->setResult(ok ? prog : 0, ok, log);
         return ok;
     }
@@ -615,6 +665,7 @@ public:
         return true;
     }
 
+    uint64_t texturesDestroyed() const { return mem_.texturesDestroyed; }
     GLuint emptyVao_ = 0, readFbo_ = 0, drawFbo_ = 0;
 
 private:
@@ -626,10 +677,17 @@ private:
     uint32_t maxLatency_ = 2;
     uint32_t bbW_ = 1, bbH_ = 1;
     bool hasNVX_ = false, hasATI_ = false;
+    std::string cacheDir_;
+    ShaderCacheStats cacheStats_;
 };
 
 // ---------------------------------------------------------------------------------------
 GLuint GLCommandList::fboFor(const RenderPassDesc& pass) {
+    if (dev_.texturesDestroyed() != seenDestroyed_) {
+        for (auto& [k, f] : fboCache_) glDeleteFramebuffers(1, &f);
+        fboCache_.clear();
+        seenDestroyed_ = dev_.texturesDestroyed();
+    }
     std::string key;
     key.reserve(96);
     auto addKey = [&](Texture* t, uint32_t mip, uint32_t layer) {

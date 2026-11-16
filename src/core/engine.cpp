@@ -120,6 +120,7 @@ bool Engine::init(const EngineConfig& cfg) {
         if (!(st.desc.flags & SettingNoPreset) && !applyingPreset_) settings_.markCustom();
     };
     settings_.load(cfg_.settingsPath);
+    device_->setProgramCacheDir(settings_.getBool("shaders.cache") ? "shader_cache" : "");
 
     // Scene
     std::string err;
@@ -161,9 +162,11 @@ bool Engine::init(const EngineConfig& cfg) {
     passes_.sort();
     for (auto& p : passes_.passes()) {
         if (p.owner == "core") continue;
-        if (p.stage == Stage::Lighting) hasLightingModule_ = true;
+        // The deferred resolve belongs to the lighting area; RT/GI passes in Stage::Lighting don't replace it.
+        if (p.stage == Stage::Lighting && p.owner.rfind("lighting", 0) == 0) hasLightingModule_ = true;
         if (p.stage == Stage::ToneMap) hasToneMapModule_ = true;
     }
+    { auto cs = device_->shaderCacheStats(); std::printf("[engine] shaders: %zu programs, %.0f ms compile, cache %u hits / %u misses\n", shaders_.programCount(), cs.compileMs, cs.hits, cs.misses); }
     std::printf("[engine] %zu modules, %zu passes, %zu settings\n", modules_.size(), passes_.passes().size(), settings_.all().size());
     for (auto& m : modules_) std::printf("  module %s\n", m->name());
 
@@ -339,8 +342,17 @@ void Engine::frame() {
     ++presentedFrames_;
 
     profiler_.counter("draw calls", renderer_.drawCallsThisFrame);
+    {
+        auto cs = device_->shaderCacheStats();
+        profiler_.counter("shaders.compileMsTotal", cs.compileMs);
+        profiler_.counter("shaders.cacheHits", cs.hits);
+        profiler_.counter("shaders.cacheMisses", cs.misses);
+        profiler_.counter("shaders.programs", double(shaders_.programCount()));
+    }
     profiler_.counter("triangles", renderer_.trianglesThisFrame);
-    profiler_.endFrame(waitMs);
+    double offThread = 0.0;
+    for (auto& m : modules_) offThread += m->offThreadCpuMs();
+    profiler_.endFrame(waitMs, offThread);
     updateDynamicResolution();
 
     prevFrame_ = ctx.frame;

@@ -59,6 +59,9 @@ public:
 
     // Profiler: report CPU-side memory this module holds (bytes), e.g. BVH or particle arrays.
     virtual size_t cpuMemoryBytes() const { return 0; }
+    // Profiler: CPU ms per frame this module spends on its own threads (audio mixer, streaming workers).
+    // Added to the frame's CPU time so per-setting Δ CPU ms includes it.
+    virtual double offThreadCpuMs() const { return 0.0; }
 };
 
 using ModuleFactory = std::function<std::unique_ptr<Module>()>;

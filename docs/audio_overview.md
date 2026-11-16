@@ -71,9 +71,9 @@ How CPU and RAM are measured:
 - **CPU** is the audio thread's busy time divided by the duration of audio it produced, i.e.
   "% of one core". At 6% the mixer needs 0.6 ms to produce 10 ms of sound. Each stage is timed
   separately with `steady_clock` and shown in the **Audio stats** window (Debug → Audio stats window)
-  and as profiler counters `audio.cpu_pct`, `audio.stage.*`. Because this runs on the device thread,
-  it does **not** appear in the frame's CPU ms, so the engine's per-setting Δ CPU ms reads ~0 for
-  audio settings; use the counters or the bench table.
+  and as profiler counters `audio.cpu_pct`, `audio.stage.*`. This runs on the device thread, so the
+  module reports it through `Module::offThreadCpuMs()` (audio CPU % × frame time), which the profiler
+  adds to frame CPU ms: the menu's per-setting Δ CPU ms and `--bench-settings` include audio.
 - **RAM** is every buffer the module allocates, by category: voice pool, mix buffers, reverb delay
   lines, HRTF delay lines, decoded sounds, stream ring buffers, device buffer
   (`Module::cpuMemoryBytes()` and counter `audio.ram_mb`).

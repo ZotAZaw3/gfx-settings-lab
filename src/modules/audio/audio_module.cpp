@@ -144,6 +144,7 @@ public:
         l.forward = {f.x, f.y, f.z};
         l.up = {u.x, u.y, u.z};
         const float dt = std::max(ctx.dt, 1e-4f);
+        lastDt_ = dt;
         if (hasLast_) l.velocity = (l.position - lastPos_) * (1.0f / dt);
         // Teleports (resets, scene loads) would read as a supersonic Doppler sweep.
         if (length(l.velocity) > 100.0f) l.velocity = {};
@@ -169,6 +170,14 @@ public:
     }
 
     size_t cpuMemoryBytes() const override { return sys_.stats().totalBytes; }
+
+    // Mixer + decoder threads, converted from "% of one core" to ms per frame so the
+    // profiler adds it to frame CPU time (per-setting Δ CPU ms then includes audio).
+    double offThreadCpuMs() const override {
+        if (!ok_) return 0.0;
+        const AudioStats st = sys_.stats();
+        return (st.callbackCpuPct + st.streamCpuPct) / 100.0 * double(lastDt_) * 1000.0;
+    }
 
     void onGui(FrameContext& ctx) override {
         if (!ok_) return;
@@ -320,6 +329,7 @@ private:
     AudioDemo demo_;
     AudioSettings last_;
     bool ok_ = false, hasLast_ = false;
+    float lastDt_ = 1.0f / 60.0f;
     Vec3 lastPos_;
 
     Setting *master_ = nullptr, *bus_[kBusCount]{}, *mute_ = nullptr;

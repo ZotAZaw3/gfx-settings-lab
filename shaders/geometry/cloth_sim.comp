@@ -1,0 +1,45 @@
+#version 450
+// Position-based cloth (Verlet + Jacobi distance constraints), one thread per particle.
+// cC.z == 0: integrate (Pin -> Pout, Prev = Pin). cC.z == 1: one constraint iteration (Pin -> Pout).
+#include "geometry/geo_common.glsl"
+#include "geometry/char_params.glsl"
+layout(local_size_x = 64) in;
+layout(std430, binding = 8) readonly buffer PIn { vec4 pin[]; };      // xyz, w inverse mass (0 = pinned)
+layout(std430, binding = 9) writeonly buffer POut { vec4 pout[]; };
+layout(std430, binding = 10) buffer Prev { vec4 prev[]; };
+void main(){
+    int W = int(cA.x), H = int(cA.y);
+    int i = int(gl_GlobalInvocationID.x);
+    if (i >= W * H) return;
+    vec4 p = pin[i];
+    if (p.w == 0.0){ pout[i] = p; return; }
+    if (cC.z < 0.5){
+        float dt = cC.x;
+        vec3 v = (p.xyz - prev[i].xyz) * 0.985;
+        float gust = valueNoise(vec2(float(i % W) * 0.15 + uTime.x * 1.7, float(i / W) * 0.15)) ;
+        vec3 wind = vec3(1.0, 0.0, 0.35) * cC.w * (0.4 + gust);
+        vec3 x = p.xyz + v + (vec3(0.0, -9.8, 0.0) + wind) * dt * dt;
+        prev[i] = p;
+        pout[i] = vec4(x, p.w);
+        return;
+    }
+    ivec2 c = ivec2(i % W, i / W);
+    vec3 x = p.xyz, corr = vec3(0.0); float n = 0.0;
+    const ivec2 nb[8] = ivec2[](ivec2(1,0), ivec2(-1,0), ivec2(0,1), ivec2(0,-1), ivec2(1,1), ivec2(-1,-1), ivec2(1,-1), ivec2(-1,1));
+    for (int k = 0; k < 8; ++k){
+        ivec2 q = c + nb[k];
+        if (q.x < 0 || q.y < 0 || q.x >= W || q.y >= H) continue;
+        vec4 o = pin[q.y * W + q.x];
+        float rest = cC.y * ((k < 4) ? 1.0 : 1.41421356);
+        vec3 d = x - o.xyz; float L = length(d);
+        float wSum = p.w + o.w;
+        if (L < 1e-6 || wSum <= 0.0) continue;
+        corr -= (p.w / wSum) * (L - rest) * d / L;
+        n += 1.0;
+    }
+    if (n > 0.0) x += corr / n * 1.6;                          // over-relaxed Jacobi average
+    vec3 s = x - cD.xyz; float sl = length(s);                   // sphere collider
+    if (sl < cD.w) x = cD.xyz + s / max(sl, 1e-5) * cD.w;
+    x.y = max(x.y, 0.02);                                        // ground
+    pout[i] = vec4(x, p.w);
+}

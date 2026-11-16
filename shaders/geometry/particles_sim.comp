@@ -1,0 +1,68 @@
+#version 450
+// GPU particle simulation: one thread per particle. Respawn on death, forces, optional
+// screen-space collision against the depth buffer (reproject, compare, bounce off reconstructed normal).
+#include "geometry/geo_common.glsl"
+#include "geometry/particle_common.glsl"
+layout(local_size_x = 256) in;
+layout(std430, binding = 8) buffer Particles { Particle p[]; };
+layout(binding = 0) uniform sampler2D tSceneDepth;
+
+vec3 rand3(uint s){ return vec3(hashU(s), hashU(s * 7u + 1u), hashU(s * 13u + 2u)); }
+vec3 turbulence(vec3 x, float t){
+    return vec3(valueNoise(x.yz * 0.7 + t) - 0.5, valueNoise(x.zx * 0.7 - t) - 0.5, valueNoise(x.xy * 0.7 + 2.0 * t) - 0.5);
+}
+void main(){
+    uint li = gl_GlobalInvocationID.x;
+    if (li >= uint(eB.x)) return;
+    uint i = li + uint(eB.y);
+    int type = int(eA.w);
+    float dt = eB.z, time = eB.w;
+    Particle q = p[i];
+    bool first = q.posLife.w <= 0.0;
+    q.velAge.w += dt;
+    if (first || q.velAge.w >= q.posLife.w){
+        uint s = i * 9781u + uint(time * 60.0) * 6271u + 17u;
+        vec3 r = rand3(s), r2 = rand3(s + 3331u);
+        if (type == 0){        // sparks fountain
+            q.posLife = vec4(eA.xyz + (r - 0.5) * 0.3, 1.2 + 1.3 * r2.x);
+            q.velAge  = vec4((r2.y - 0.5) * 4.0, 7.0 + 4.0 * r.y, (r2.z - 0.5) * 4.0, 0.0);
+            q.color   = vec4(mix(vec3(1.0, 0.45, 0.1), vec3(1.0, 0.85, 0.4), r.z) * 2.0, 0.035);
+        } else if (type == 1){ // smoke column
+            q.posLife = vec4(eA.xyz + vec3(r.x - 0.5, 0.0, r.z - 0.5) * 1.2, 5.0 + 3.0 * r2.x);
+            q.velAge  = vec4((r2.y - 0.5) * 0.5, 1.0 + r.y, (r2.z - 0.5) * 0.5, 0.0);
+            q.color   = vec4(vec3(0.30 + 0.15 * r.z), 0.7);
+        } else {               // fire
+            q.posLife = vec4(eA.xyz + vec3(r.x - 0.5, 0.0, r.z - 0.5) * 1.0, 0.6 + 0.7 * r2.x);
+            q.velAge  = vec4((r2.y - 0.5) * 0.6, 1.8 + 2.0 * r.y, (r2.z - 0.5) * 0.6, 0.0);
+            q.color   = vec4(vec3(4.0, 1.4, 0.3), 0.45);
+        }
+        if (first) q.velAge.w = r2.x * q.posLife.w;     // stagger the very first spawn
+    }
+    vec3 g = (type == 0) ? vec3(0.0, -9.8, 0.0) : vec3(0.0, 0.5, 0.0);
+    float drag = (type == 0) ? 0.15 : 0.8;
+    vec3 acc = g - q.velAge.xyz * drag + turbulence(q.posLife.xyz, time * 0.5) * ((type == 0) ? 0.6 : 3.0);
+    vec3 v = q.velAge.xyz + acc * dt;
+    vec3 x = q.posLife.xyz + v * dt;
+    if (eC.x > 0.5){
+        vec4 c = uUnjitteredViewProj * vec4(x, 1.0);
+        if (c.w > 0.0){
+            vec3 ndc = c.xyz / c.w; vec2 uv = ndcToUv(ndc.xy);
+            if (all(greaterThan(uv, vec2(0.002))) && all(lessThan(uv, vec2(0.998)))){
+                float sd = textureLod(tSceneDepth, uv, 0.0).r;
+                float pl = linearDepth(ndc.z), sl = linearDepth(sd);
+                if (pl > sl && pl < sl + 0.5){            // just behind the visible surface -> collided
+                    vec2 px = uRenderSize.zw * 2.0;
+                    vec3 w0 = reconstructWorldPos(uv, sd);
+                    vec3 w1 = reconstructWorldPos(uv + vec2(px.x, 0.0), textureLod(tSceneDepth, uv + vec2(px.x, 0.0), 0.0).r);
+                    vec3 w2 = reconstructWorldPos(uv + vec2(0.0, px.y), textureLod(tSceneDepth, uv + vec2(0.0, px.y), 0.0).r);
+                    vec3 n = normalize(cross(w1 - w0, w2 - w0));
+                    if (dot(n, v) > 0.0) n = -n;
+                    v = reflect(v, n) * 0.45;
+                    x = q.posLife.xyz;
+                }
+            }
+        }
+    }
+    q.posLife.xyz = x; q.velAge.xyz = v;
+    p[i] = q;
+}

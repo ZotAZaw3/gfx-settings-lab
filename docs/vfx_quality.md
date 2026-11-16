@@ -1,0 +1,113 @@
+# VFX / Effects Quality
+
+> Menu: **Effects → Effects Quality** (a bundle) + **Effects Resolution / Flipbook Interpolation**
+> Setting ids: `effects.vfxQuality`, `effects.resolution` (Full / Half / Quarter), `effects.flipbookBlend` · Owner module: `geometry.particles`
+> Presets: Low…Ultra. Changing Effects Quality sets Particle Quality, Spawn Rate, Effects Resolution and Flipbook Interpolation.
+> Files: `src/modules/geometry/particles.cpp` (`applyVfxPreset`), `shaders/geometry/depth_downsample.frag`, `fx_composite.frag`
+
+## Definition
+
+"Effects quality" is a catch-all that covers every transient visual effect that is not
+lighting or geometry: explosions, muzzle flashes, sparks, smoke, fire, magic spells,
+heat haze, water splashes, footprints, screen-space distortion, trails/ribbons and
+lens dirt. In most games it is a bundle: one slider that changes particle counts,
+effect render resolution, sprite texture size, distortion, and how many effects may be
+alive at once.
+
+## How it works
+
+The preset fans out like this in the prototype:
+
+| Sub-setting               | Low      | Medium  | High    | Ultra   |
+|---------------------------|----------|---------|---------|---------|
+| Particle quality          | Low      | Medium  | High    | Ultra   |
+| Effects render resolution | Quarter  | Half    | Full    | Full    |
+| Heat haze / distortion    | off      | off     | on      | on      |
+| Flipbook frame blending   | off      | on      | on      | on      |
+| Max live emitters         | 4        | 8       | 16      | 32      |
+| Spawn-rate scale          | 0.25     | 0.5     | 1.0     | 1.0     |
+
+Key techniques:
+- **Off-screen (reduced-res) effects buffer.** Transparent effects are drawn into a
+  1/2 or 1/4 resolution colour target with a downsampled depth buffer, then composited
+  with a **bilateral upsample** that picks the low-res sample whose depth best matches
+  the full-res pixel. Avoids halos around edges.
+- **Flipbooks.** Animated fire/smoke is an atlas of frames. With interpolation, the
+  shader blends frame N and N+1 (or uses motion vectors baked per frame to warp between
+  them), so 16 frames look as smooth as 64.
+- **Distortion.** Heat haze / shockwaves render normal-map-like offsets into a
+  distortion buffer, then a fullscreen pass samples the scene colour at
+  `uv + offset`. Needs a copy of the scene colour (cannot read and write the same target).
+- **Emitter budget.** A manager keeps the N most important effects (closest, biggest,
+  gameplay-relevant) and culls the rest.
+
+## Breakdown
+
+**In this prototype:**
+
+1. Effects Quality → Particle Quality Low/Medium/High/Ultra, Spawn Rate 0.25 / 0.5 / 1 / 1,
+   Effects Resolution Quarter / Half / Full / Full, Flipbook Interpolation off / on / on / on.
+2. Heat haze / distortion is owned by the post-processing thread (`docs/heat_haze_distortion.md`), so it is
+   not part of this bundle here.
+3. Reduced resolution = `geometry.fx` and `geometry.fxDepth` created at 0.5 / 0.25 render scale (`SettingRequiresResize`).
+
+
+- Effects resolution: Full → Half is ~4× fewer blended pixels; Quarter ~16×.
+- Distortion: one extra scene-colour copy + one fullscreen pass (~0.1–0.3 ms at 1440p).
+- Flipbook blending: 2 texture fetches instead of 1 per particle pixel.
+- Emitter cap / spawn scale: linear in particle count and overdraw.
+
+Effects quality matters most in **combat**: a GPU that holds 120 fps exploring can drop
+to 60 during explosions when every effect fills the screen. That is why competitive
+players often run effects on Low even with a strong GPU (also better visibility).
+
+## Optimization
+
+- Reduced-resolution effects + bilateral upsample is the single biggest win.
+- Budget by **screen coverage**, not by count.
+- Use simple shaders for distant effects (effect LOD).
+- Pre-bake complex simulations (fluid fire) into flipbooks instead of simulating live.
+- Pool and recycle emitters; avoid per-frame allocation.
+- Merge distortion into the post-process chain so no extra copy is needed.
+
+### Measured cost (llvmpipe, relative only)
+
+Measured with `gfxlab --bench-settings` on Mesa llvmpipe (a CPU software renderer), 640×360, 5 warm-up + 30 measured frames per value, showcase camera on the terrain overview. Each row is the change versus the High preset with only that one setting moved. On llvmpipe the GPU work runs on the CPU, so GPU and CPU columns move together, and two runs of the same configuration differed by up to ~35 ms, so treat anything under ~30 ms as noise. Use the table for direction and rough ratios only; rerun `--bench-settings` on real hardware for actual numbers.
+
+<!-- bench: effects.vfxQuality effects.resolution effects.flipbookBlend -->
+Measured on `llvmpipe  LLVM 20 1 2  256 bits  geometry` (deltas vs the High preset; from `llvmpipe__LLVM_20_1_2__256_bits__geometry.csv`):
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ frame ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|---|
+| Effects Quality | Low | -232.756 | -244.983 | -244.993 | -5.2 | -6.0 |
+| Effects Quality | Medium | -195.132 | -199.957 | -199.970 | -3.8 | -6.0 |
+| Effects Quality | High | -44.983 | -50.178 | -50.218 | +0.0 | -0.8 |
+| Effects Quality | Ultra | +437.470 | +456.868 | +456.856 | +18.0 | +117.5 |
+| Effects Resolution | Full | -6.247 | -8.623 | -8.656 | +0.0 | +0.0 |
+| Effects Resolution | Half | -21.966 | -25.973 | -25.984 | -1.1 | +0.0 |
+| Effects Resolution | Quarter | -31.391 | -36.576 | -36.606 | -1.6 | +0.0 |
+| Flipbook Interpolation | Off | -19.111 | -22.865 | -22.881 | +0.0 | +0.0 |
+| Flipbook Interpolation | On | -20.240 | -24.081 | -24.096 | +0.0 | +0.0 |
+<!-- /bench -->
+
+## Rebuild (from scratch)
+
+```cpp
+void applyVfxPreset(GeoVfxSettings& s) {
+    static const struct { int pq, res; bool dist, blend; int emitters; float spawn; } k[4] = {
+        {0, 2, false, false,  4, 0.25f},   // res: 0=Full 1=Half 2=Quarter
+        {1, 1, false, true,   8, 0.50f},
+        {2, 0, true,  true,  16, 1.00f},
+        {3, 0, true,  true,  32, 1.00f}};
+    auto& p = k[int(s.vfxQuality)];
+    s.particleQuality = ParticleQuality(p.pq); s.vfxResolution = p.res;
+    s.distortion = p.dist; s.flipbookBlend = p.blend;
+    s.maxEmitters = p.emitters; s.spawnScale = p.spawn;
+}
+```
+Render loop:
+1. Downsample depth to the effects resolution (max or min depth per 2×2 block).
+2. Bind the effects FBO (RGBA16F), clear to (0,0,0,1) for premultiplied alpha.
+3. Draw particles with soft-particle test against the low-res depth.
+4. Composite onto the HDR scene: `scene = scene * fx.a + fx.rgb`, with bilateral upsample.
+5. If distortion is on: draw distortion sprites to an RG16F buffer and run the offset pass.

@@ -45,6 +45,15 @@ Code: `src/modules/aa/temporal.cpp`, `shaders/aa/rr_lite.frag`. Inputs `rt.noisy
 - Reproject specular with the *virtual* (reflected) position for mirror-like surfaces.
 - Pack guides (normal octahedral + depth) into one RGBA16F to cut bandwidth.
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| Ray Reconstruction | Off (denoiser + upscaler) | +3.8 | +3.2 | +0.0 | +0.0 |
+| Ray Reconstruction | RR-lite (ours) | +37.1 | +36.3 | +0.0 | +0.0 |
+
 ## Rebuild (from scratch)
 
 Core of `rr_lite.frag`:

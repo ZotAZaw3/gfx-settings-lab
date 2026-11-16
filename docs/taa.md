@@ -49,6 +49,23 @@ Code: `src/modules/aa/temporal.cpp`, `shaders/aa/taa_resolve.frag`, `shaders/aa/
 - Exclude particles/transparents from velocity; render them after TAA or give them a reactive mask.
 - On camera cuts, reset history (alpha = 1 for one frame).
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| Anti-Aliasing | Off | -22.2 | -21.9 | +0.0 | +0.2 |
+| Anti-Aliasing | FXAA | +1.0 | -1.1 | +0.0 | +0.2 |
+| Anti-Aliasing | SMAA | +6.0 | +6.0 | +0.0 | +0.3 |
+| Anti-Aliasing | TAA | +0.9 | +0.7 | +0.0 | +0.3 |
+| TAA History Clip | 0.50 | -1.9 | -1.2 | +0.0 | +0.0 |
+| TAA History Clip | 1.25 | -0.2 | +1.7 | +0.0 | +0.0 |
+| TAA History Clip | 3.00 | -0.7 | -0.5 | +0.0 | +0.0 |
+| TAA History Weight | 0.50 | -6.9 | -6.4 | +0.0 | +0.0 |
+| TAA History Weight | 0.92 | -5.6 | -4.1 | +0.0 | +0.0 |
+| TAA History Weight | 0.98 | -7.5 | -7.4 | +0.0 | +0.0 |
+
 ### Measured quality
 
 Measured with `tests/aa/quality_test.py` (512x288 procedural scene: thin lines, a moving rotated square, HDR highlights; Mesa llvmpipe). PSNR against a 16x16 supersampled reference, higher is better.

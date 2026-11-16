@@ -46,6 +46,20 @@ Code: core writes `scene.velocity` in the G-buffer / forward pass (`shaders/core
 - **Dilate** before use: sample the 3x3 neighbourhood, take the velocity of the closest-depth pixel. This keeps the foreground's motion on its anti-aliased edges and removes ghost trails behind thin objects.
 - Transparent / particle surfaces don't write velocity; mark them with a reactive mask (FSR) or let the TAA neighbourhood clamp handle them.
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| AA Debug View | Off | +5.1 | +4.9 | +0.0 | +0.0 |
+| AA Debug View | Motion vectors | +3.9 | +4.0 | +0.0 | +0.0 |
+| AA Debug View | History only | -1.0 | -2.4 | +0.0 | +0.0 |
+| AA Debug View | History rejection | -8.8 | -9.3 | +0.0 | +0.0 |
+| AA Debug View | Upscaler confidence | +0.0 | -0.7 | +0.0 | +0.0 |
+| AA Debug View | RR-lite history length | +0.6 | -0.1 | +0.0 | +0.0 |
+| AA Debug View | Frame gen source | -2.5 | -2.4 | +0.0 | +0.0 |
+
 ## Rebuild (from scratch)
 
 ```glsl

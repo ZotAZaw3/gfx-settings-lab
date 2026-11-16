@@ -43,6 +43,22 @@ In this prototype:
 - When using upscaling (TAA-U/FSR/DLSS), apply a **negative mip bias** of `log2(renderWidth / outputWidth)` (e.g. -1 at 50% scale) so textures are sampled at output-resolution detail. The upscaler accumulates the extra detail. This prototype does it automatically when render scale < 1.
 - Block-compressed formats (BC1/BC3/BC7, ASTC) halve or quarter bandwidth and filter in hardware at full speed.
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| Texture Filtering | Nearest | -82.4 | -81.6 | +0.0 | +0.1 |
+| Texture Filtering | Bilinear | -78.3 | -77.3 | +0.0 | +0.2 |
+| Texture Filtering | Trilinear | -69.9 | -69.9 | +0.0 | +0.4 |
+| Texture Filtering | Anisotropic 2x | -48.0 | -46.3 | +0.0 | +0.5 |
+| Texture Filtering | Anisotropic 4x | -31.5 | -31.0 | +0.0 | +0.7 |
+| Texture Filtering | Anisotropic 8x | -15.9 | -13.8 | +0.0 | +0.8 |
+| Texture Filtering | Anisotropic 16x | +0.4 | +1.9 | +0.0 | +0.8 |
+| Mip Bias for Upscaling | Off | +5.5 | +7.2 | +0.0 | +0.0 |
+| Mip Bias for Upscaling | On | -0.1 | -0.0 | +0.0 | +0.0 |
+
 ## Rebuild (from scratch)
 
 Software trilinear + anisotropic sampler in a shader (useful to understand what the hardware does; `shaders/aa/manual_aniso.glsl`):

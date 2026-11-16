@@ -42,6 +42,17 @@ In this prototype the setting `aa.msaa.samples` (Off/2x/4x/8x) switches the core
 - Combine with FXAA/SMAA, or use TAA if you need shader-aliasing coverage.
 - Tile-based mobile GPUs resolve MSAA on-chip almost for free; there it is still the best AA.
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| MSAA | Off | -2.0 | -0.9 | +0.0 | +0.0 |
+| MSAA | 2x | +98.3 | +99.7 | +63.3 | +127.3 |
+| MSAA | 4x | +103.5 | +104.8 | +126.6 | +190.6 |
+| MSAA | 8x | +100.6 | +100.7 | +126.6 | +190.6 |
+
 ## Rebuild (from scratch)
 
 Supersampling (SSAA) is the brute-force ancestor: render at 2x width and height and downsample. MSAA is the optimisation of it. To rebuild MSAA without hardware support you would store N depth + coverage samples per pixel and shade once, which is exactly what the hardware does; so "rebuild" here means writing the resolve yourself:

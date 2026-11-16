@@ -91,6 +91,23 @@ In the app (960x540 output, demo scene): native TAA (top left), Temporal TAAU at
 
 ![Upscalers at 50% render scale](images/aa/upscalers_50pct.png)
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| Upscaler | Off (Native) | +4.1 | +5.7 | +0.0 | +0.0 |
+| Upscaler | FSR 1-style (spatial, ours) | -91.4 | -90.6 | -58.1 | +0.0 |
+| Upscaler | NIS-lite (spatial, ours) | -78.2 | -77.4 | -58.1 | +0.0 |
+| Upscaler | Temporal TAAU (FSR 2-style, ours) | -17.5 | -17.9 | -58.1 | +0.0 |
+| Upscaler Quality | Native AA (100%) | -3.5 | -4.2 | +0.0 | +0.0 |
+| Upscaler Quality | Ultra Quality (77%) | -3.1 | -4.2 | +0.0 | +0.0 |
+| Upscaler Quality | Quality (67%) | -3.2 | -3.5 | +0.0 | +0.0 |
+| Upscaler Quality | Balanced (58%) | -2.7 | -3.6 | +0.0 | +0.0 |
+| Upscaler Quality | Performance (50%) | -4.1 | -5.7 | +0.0 | +0.0 |
+| Upscaler Quality | Ultra Performance (33%) | -3.6 | -3.2 | +0.0 | +0.0 |
+
 ### Measured quality
 
 Measured with `tests/aa/quality_test.py` (512x288 procedural scene: thin lines, a moving rotated square, HDR highlights; Mesa llvmpipe). PSNR against a 16x16 supersampled reference, higher is better.

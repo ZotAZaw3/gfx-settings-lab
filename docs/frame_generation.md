@@ -48,6 +48,20 @@ Code: `src/modules/aa/frame_gen.cpp`, `shaders/aa/fg_optical_flow.frag` (3x3 blo
 - With V-Sync off and VRR on, cap the *output* rate just below the refresh rate.
 - Skip generation (just repeat) on camera cuts, detected by a flow confidence drop.
 
+### Measured cost
+
+Measured cost at 1920×1080 (`gfxlab --bench-settings`), GPU: **Mesa llvmpipe 25.2.8 (software rasterizer, CPU)**. Deltas are against the High preset (TAA, CAS, AF 16x, native). On llvmpipe a whole frame takes hundreds of ms and the run-to-run noise is about ±8 ms (changing a setting with no rendering effect moves it that much), so only large differences mean anything; on a real GPU every pass here costs well under 1 ms. Greyed-out vendor options (DLSS, FSR 3, XeSS) snap back to our version, so they aren't listed.
+
+| Setting | Value | Δ GPU ms | Δ CPU ms | Δ VRAM MB | Δ RAM MB |
+|---|---|---|---|---|---|
+| Frame Generation | Off | +0.7 | +1.2 | +0.0 | +0.0 |
+| Frame Generation | 2x Interpolation (ours) | +100.1 | +162.8 | +0.0 | +0.1 |
+| Optical Flow Search | 0 | -4.1 | -5.1 | +0.0 | +0.0 |
+| Optical Flow Search | 1 | -2.5 | -6.0 | +0.0 | +0.0 |
+| Optical Flow Search | 2 | -11.3 | -12.4 | +0.0 | +0.0 |
+| Optical Flow Search | 3 | -11.8 | -12.9 | +0.0 | +0.0 |
+| Optical Flow Search | 4 | -13.7 | -16.1 | +0.0 | +0.0 |
+
 ### Measured quality
 
 Measured with `tests/aa/quality_test.py` (512x288 procedural scene: thin lines, a moving rotated square, HDR highlights; Mesa llvmpipe). PSNR against a 16x16 supersampled reference, higher is better.

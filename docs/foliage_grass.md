@@ -1,9 +1,9 @@
 # Grass and Foliage (Density, Quality, Draw Distance)
 
-Menu: **World → Grass Density** (0 – 100 %), **Foliage Quality** (`Low | Medium | High | Ultra`),
-**Foliage Draw Distance** (20 – 400 m), **Grass Interaction** (on/off), **Wind Animation** (on/off)
-Code: `GeoVfxSettings::grassDensity`, `foliageQuality`, `foliageDistance`, `grassInteract`,
-`foliageWind`; shaders `geometry/grass_gen.comp`, `geometry/grass.vert/.frag`
+> Menu: **World → Grass Density / Foliage Quality / Foliage Draw Distance / Wind Animation / Grass Interaction**
+> Setting ids: `world.grassDensity`, `world.foliageQuality`, `world.foliageDistance` (20–300 m), `world.foliageWind`, `world.grassInteraction` · Owner module: `geometry.foliage`
+> Presets: density 0.25 / 0.5 / 0.75 / 1; quality Low…Ultra (3 / 5 / 7 / 15 vertices per blade); distance 40 / 80 / 120 / 250 m
+> Files: `src/modules/geometry/foliage.cpp`, `shaders/geometry/grass_gen.comp`, `grass.{vert,frag}`
 
 ## Definition
 
@@ -36,6 +36,15 @@ fps effect in open-world games.
    around the camera; blades read it and bend away, recovering over time.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 15 — "Grass": 4 compute dispatches, one per distance tier (dist/8, /4, /2, 1), cell
+   size doubling per tier and snapped to world space so blades don't swim; each thread jitters a blade, applies
+   density falloff, rejects plaza/lake/snow/cliffs, frustum-culls and `atomicAdd`s into an indirect draw.
+2. One `drawIndirect` of triangle strips writes the G-buffer with shading model 2 (foliage).
+3. Grass does not cast shadows in this prototype (the lighting thread's shadow pass draws only the scene DrawList).
+
 
 | Foliage quality | Blade verts | Max distance | Shadows from grass | Tree LOD bias |
 |-----------------|-------------|--------------|--------------------|---------------|

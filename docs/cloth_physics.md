@@ -1,8 +1,9 @@
 # Cloth Physics and Physics/Destruction Quality
 
-Menu: **Physics → Cloth Simulation** (`Off | Low | High`), **Physics Detail / Debris**
-(`Low | Medium | High`)
-Code: `GeoVfxSettings::cloth`, `physicsDetail`; shader `geometry/cloth_sim.comp`
+> Menu: **Physics → Cloth Simulation / Wind Strength**
+> Setting ids: `physics.cloth` (Off / Low / High), `physics.windStrength` · Owner module: `geometry.characters`
+> Presets: Off, Low, High, High · Low = 16-wide grid, 4 iterations; High = 48-wide grid, 12 iterations
+> Files: `src/modules/geometry/characters.cpp`, `shaders/geometry/cloth_sim.comp`, `cloth.vert`
 
 ## Definition
 
@@ -33,6 +34,15 @@ rigid bodies when hit. A quality setting caps the chunk count, the debris lifeti
 whether small debris uses full physics or simple particles.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `FrameSetup`, order 60 — "Cloth sim": 1 integrate dispatch + N Jacobi constraint dispatches,
+   ping-ponging two position SSBOs (bindings 8/9) with a previous-position SSBO (10).
+2. Stage `GBuffer`, order 20 — the flag is drawn by vertex pulling (6 vertices per quad, no vertex/index buffer).
+   Off = rest pose plus an analytic flutter in the vertex shader (the "canned animation" path).
+3. Destruction/debris quality is explained below for reference; it is not implemented in the prototype.
+
 
 | Cloth   | Grid       | Iterations | Self-collision |
 |---------|------------|------------|----------------|

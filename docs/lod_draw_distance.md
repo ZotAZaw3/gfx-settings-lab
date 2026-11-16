@@ -1,9 +1,9 @@
 # Level of Detail (LOD) and Draw Distance
 
-Menu: **Geometry → LOD Bias** (slider −2 … +3), **LOD Transition** (`Pop | Dither`),
-**Draw Distance** (50 – 2000 m), **Foliage/Detail Distance** (0.25× – 2×)
-Code: `GeoVfxSettings::lodBias`, `lodDither`, `drawDistance`, `detailDistanceScale`;
-`GeoVfxModule::selectLod()`, shader `lod_dither.glsl`
+> Menu: **Geometry → LOD Bias / LOD Hysteresis / Draw Distance**, **World → Geometry Showcase Area / Jump Camera To**
+> Setting ids: `geometry.lodBias` (−2…3), `geometry.lodHysteresis`, `geometry.drawDistance` (50–2000 m), `world.showcase`, `world.showcaseCamera` · Owner module: `geometry.lod`
+> Presets: LOD Bias Low=+1, Medium=0, High=0, Ultra=−1 · Draw Distance 150 / 300 / 600 / 1200 m
+> Files: `src/modules/geometry/lod_culling.cpp`
 
 ## Definition
 
@@ -39,6 +39,17 @@ both, plus separate distances for small "detail" objects like grass, rocks and d
    city blocks).
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `FrameSetup` — `geometry.lod::filterDraws` (runs after core fills the DrawList at order −100):
+   draw-distance cull → frustum cull → small-object cull → CPU occlusion → LOD pick → writes back `opaque`/`transparent`.
+2. LOD pick in this prototype uses the **projected simplification error** rather than fixed pixel-radius thresholds:
+   `errPx = lod.error * scale / distance * proj[1][1] * height/2`; the coarsest level with `errPx ≤ 1 px · 2^bias` wins
+   (the same rule Nanite uses per cluster). Hysteresis requires 20 % extra margin before switching coarser than last frame.
+3. The showcase "LOD field" (≈350 dense torus knots, 15k triangles each at LOD0) is added to the scene so you can watch
+   the triangle counter (`lod.triangles` in the overlay) react to LOD Bias and Model Quality.
+
 
 | Knob            | GPU effect                                   | CPU effect                      |
 |-----------------|----------------------------------------------|---------------------------------|

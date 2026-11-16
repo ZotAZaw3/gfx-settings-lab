@@ -1,8 +1,9 @@
 # Water Quality
 
-Menu: **World → Water Quality** (`Low | Medium | High | Ultra`),
-**Water Tessellation** (on/off), **Caustics** (on/off)
-Code: `GeoVfxSettings::waterQuality`, `waterTess`, `caustics`; shaders `geometry/water.*`
+> Menu: **World → Water Quality / Caustics**
+> Setting ids: `world.waterQuality` (Low / Medium / High / Ultra), `world.caustics` · Owner module: `geometry.water`
+> Presets: quality Low…Ultra; caustics off, off, on, on
+> Files: `src/modules/geometry/water.cpp`, `shaders/geometry/water.{vert,frag}`, `water_common.glsl`
 
 ## Definition
 
@@ -33,6 +34,15 @@ the bottom) and interaction (wakes, splashes).
    surface; projected on the sea floor.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `Translucent`, order 5 — "Water": copy `scene.color`, draw a 64 m grid (32² / 64² / 128² / 192²) over the
+   lake with 0 / 4 / 8 / 12 Gerstner waves; manual depth test against `scene.depth`; writes the final colour.
+2. Low: ripples only, no refraction, sky reflection. Medium: + refraction, foam. High/Ultra: + screen-space
+   reflection march (24 steps). Caustics modulate the refracted lake bottom.
+3. The FFT ocean described below is the reference for larger water bodies; the prototype uses Gerstner sums.
+
 
 | Level  | Waves                   | Geometry              | Refraction | Foam | Caustics |
 |--------|-------------------------|-----------------------|------------|------|----------|

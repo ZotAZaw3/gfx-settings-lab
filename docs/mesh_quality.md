@@ -1,7 +1,8 @@
 # Model / Mesh Quality
 
-Menu: **Geometry → Model Quality** (`Low | Medium | High | Ultra`)
-Code: `src/modules/geometry/` → `GeoVfxSettings::meshQuality`, `MeshLibrary::build()`
+> Menu: **Geometry → Model Quality** · Setting id: `geometry.meshQuality` · Owner module: `geometry.lod`
+> Values: Low / Medium / High / Ultra · Presets: Low=Low, Medium=Medium, High=High, Ultra=Ultra
+> Files: `src/modules/geometry/lod_culling.cpp`, `src/modules/geometry/geo_util.cpp` (`simplifyClustered`)
 
 ## Definition
 
@@ -26,17 +27,22 @@ density, because those all scale with vertex count.
 4. **Per-vertex payload** shrinks too: Low uses 2 bone weights instead of 4, packed
    16-bit normals and half-float UVs.
 
-In this prototype the meshes are procedural (UV sphere, torus-knot, terrain grid) so
-"quality" is the tessellation of the generator:
-
-| Level  | Sphere seg × rings | Torus knot seg × sides | Terrain grid |
-|--------|--------------------|------------------------|--------------|
-| Low    | 12 × 8             | 64 × 6                 | 32²          |
-| Medium | 24 × 16            | 128 × 10               | 64²          |
-| High   | 48 × 32            | 256 × 16               | 128²         |
-| Ultra  | 96 × 64            | 512 × 24               | 256²         |
+In this prototype Model Quality is applied to **every** scene primitive: LOD chains are generated at load
+time by vertex clustering and Model Quality offsets the LOD that the projected-error rule picks
+(Low +2 levels, Medium +1, High 0, Ultra 0 with half the error tolerance).
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `FrameSetup` — `filterDraws` of `geometry.lod`: for every item core put in the DrawList it picks
+   `DrawItem::lod`; Model Quality adds a fixed offset (Low +2, Medium +1, High 0, Ultra 0) and scales the allowed
+   projected error (1.5 / 1.25 / 1.0 / 0.5 px).
+2. At load (and whenever the scene changes) every primitive with ≥ 200 triangles gets up to three extra LODs from
+   `geo::simplifyClustered` (vertex clustering at 40 / 20 / 10 cells across the bounding box), stored with
+   `Scene::addLod(prim, indices, cellSize)`. Every pass that draws the scene (G-buffer, shadows, forward) then uses the
+   picked LOD automatically.
+
 
 | Cost                | Scales with                                                   |
 |---------------------|---------------------------------------------------------------|
@@ -78,10 +84,11 @@ for (float ratio : {0.5f, 0.25f, 0.125f}) {
     chain.push_back(m);
 }
 // 3. The setting = which chain index LOD 0 uses.
-int baseLod = 3 - int(settings.meshQuality);   // Ultra=0 ... Low=3
+int baseLod = (int[]){2, 1, 0, 0}[int(settings.meshQuality)];   // Low +2 ... Ultra 0 (+ half error tolerance)
 ```
 Upload each chain entry to its own VBO/IBO (or one big buffer with offsets), and let
 the LOD system add its own distance-based offset to `baseLod`.
 
-In the prototype we skip meshoptimizer and just regenerate the procedural mesh at the
-table's resolution when the setting changes (`MeshLibrary::build(quality)`).
+In the prototype we skip meshoptimizer and use `geo::simplifyClustered` (vertex clustering, ~60 lines, no
+dependencies): snap vertices to a grid of N cells across the bounding box, keep one representative vertex per cell
+(closest to the cell average), drop triangles that collapse. Lower quality than quadric collapse, but robust and fast.

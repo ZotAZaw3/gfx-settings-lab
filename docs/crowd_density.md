@@ -1,8 +1,8 @@
 # Crowd / Population Density
 
-Menu: **World → Crowd Density** (`Low | Medium | High | Ultra`),
-**Crowd Animation** (`Baked | Skinned`)
-Code: `GeoVfxSettings::crowdDensity`, `crowdSkinned`; draws instanced proxy characters
+> Menu: **World → Crowd Density** · Setting id: `world.crowdDensity` (Low / Medium / High / Ultra = 25 / 75 / 200 / 500 agents) · Owner module: `geometry.characters`
+> Presets: Low…Ultra
+> Files: `src/modules/geometry/characters.cpp`, `shaders/geometry/crowd.vert`
 
 ## Definition
 
@@ -24,6 +24,13 @@ call or instance.
 4. **Rendering LOD.** Mesh LODs → impostor billboards at long range; all instanced.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 20 — one instanced capsule draw; each agent's position is a closed-form function of
+   (id, time) evaluated at t and t − dt in the vertex shader, so motion vectors are correct for TAA/motion blur.
+2. In a real game the CPU (AI, pathfinding, animation) dominates; the prototype shows only the GPU side.
+
 
 | Level  | Agents near player | Full-AI radius | Animation update     |
 |--------|--------------------|----------------|----------------------|

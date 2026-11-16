@@ -1,9 +1,9 @@
 # Particles (GPU Particle Systems)
 
-Menu: **Effects → Particle Quality** (`Low | Medium | High | Ultra`),
-**Particle Lighting** (`Unlit | Lit`), **Soft Particles** (on/off), **Particle Collision** (on/off)
-Code: `GeoVfxSettings::particleQuality`, `particleLit`, `softParticles`, `particleCollision`;
-shaders `particles_sim.comp`, `particles.vert/.frag`
+> Menu: **Effects → Particle Quality / Spawn Rate / Particle Lighting / Soft Particles / Particle Collision**
+> Setting ids: `effects.particleQuality` (16k / 48k / 128k / 512k), `effects.spawnScale`, `effects.particleLighting`, `effects.softParticles`, `effects.particleCollision` · Owner module: `geometry.particles`
+> Presets: quality Low…Ultra; lighting Unlit, Unlit, Lit, Lit; soft off, on, on, on; collision off, off, on, on
+> Files: `src/modules/geometry/particles.cpp`, `shaders/geometry/particles_sim.comp`, `particles.{vert,frag}`
 
 ## Definition
 
@@ -45,6 +45,16 @@ A compute shader runs one thread per particle each frame:
   with normal-mapped sprites; also receiving shadows.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `FrameSetup`, order 50 — "Particle sim": 3 dispatches (sparks 30 %, smoke 30 %, fire 40 % of the budget),
+   256 threads per group, SSBO binding 8. Collision reads **last frame's** `scene.depth` (the G-buffer hasn't run yet).
+2. Stage `Translucent`, order 20 — "Particles": downsample depth if effects run below full res, draw
+   `count × 6` vertices per emitter (no vertex buffer) into `geometry.fx` (RGBA16F, premultiplied), manual depth
+   test + soft fade in the pixel shader, then composite onto `scene.color` with (ONE, ONE_MINUS_SRC_ALPHA).
+3. Smoke is not sorted (premultiplied blending hides most errors at this density).
+
 
 | Level  | Max particles | Sim       | Soft | Lighting | Collision |
 |--------|---------------|-----------|------|----------|-----------|

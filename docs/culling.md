@@ -1,9 +1,9 @@
 # Culling (Frustum and Occlusion)
 
-Menu: **Performance → Frustum Culling** (on/off), **Occlusion Culling**
-(`Off | CPU Hi-Z | GPU Hi-Z`), **Small Object Culling** (px, 0 – 8), **Culling Stats** overlay
-Code: `GeoVfxSettings::frustumCull`, `occlusionCull`, `smallCullPx`;
-`GeometryModule::visibilityHook()`, shaders `geometry/hiz_build.comp`, `geometry/cull.comp`
+> Menu: **Performance → Frustum Culling / Occlusion Culling / Small Object Culling**
+> Setting ids: `performance.frustumCulling`, `performance.occlusionCulling` (Off / On), `performance.smallObjectCulling` (0–8 px) · Owner module: `geometry.lod`
+> Presets: Occlusion On for all presets · Small object 4 / 2 / 1 / 0.5 px
+> Files: `src/modules/geometry/lod_culling.cpp` (`OcclusionBuffer`), `shaders/geometry/terrain.tesc` (patch culling)
 
 ## Definition
 
@@ -42,6 +42,19 @@ used by many engines), precomputed visibility (PVS / portals for indoor levels),
 **cluster/meshlet culling** (per 64-triangle chunk, Nanite) including back-face cone tests.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `FrameSetup` — `geometry.lod::filterDraws`. Frustum test = AABB "positive vertex" test against 5 planes
+   (left, right, bottom, top, near; the reversed-Z projection is infinite so there is no far plane).
+2. **Implemented occlusion = CPU software rasterization** (the Intel Masked Occlusion Culling idea, simplified):
+   the 48 biggest visible objects (coarsest LOD) plus a 48×48 grid of the terrain are rasterized into a 256×144
+   reversed-Z depth buffer, a 6-level min pyramid is built, and every AABB is tested against the mip where its
+   screen rect is ~2×2 texels. Counters `cull.frustum / cull.occlusion / cull.small / cull.distance` show results.
+3. Terrain patches are frustum-culled on the GPU in the hull shader (tess factor 0).
+4. The GPU Hi-Z two-phase method described below is the reference design; it is not used in this module because
+   the core DrawList is CPU-side.
+
 
 | Technique          | Cost                             | Saves                                  |
 |--------------------|----------------------------------|----------------------------------------|

@@ -1,10 +1,9 @@
 # VFX / Effects Quality
 
-Menu: **Effects → Effects Quality** (`Low | Medium | High | Ultra`) — a *preset* that drives
-several sub-settings at once; **Effects Resolution** (`Quarter | Half | Full`),
-**Distortion / Heat Haze** (on/off), **Flipbook Interpolation** (on/off)
-Code: `GeoVfxSettings::vfxQuality` → `applyVfxPreset()`; `vfxResolution`, `distortion`,
-`flipbookBlend`; shaders `particles.frag`, `distortion.frag`
+> Menu: **Effects → Effects Quality** (a bundle) + **Effects Resolution / Flipbook Interpolation**
+> Setting ids: `effects.vfxQuality`, `effects.resolution` (Full / Half / Quarter), `effects.flipbookBlend` · Owner module: `geometry.particles`
+> Presets: Low…Ultra. Changing Effects Quality sets Particle Quality, Spawn Rate, Effects Resolution and Flipbook Interpolation.
+> Files: `src/modules/geometry/particles.cpp` (`applyVfxPreset`), `shaders/geometry/depth_downsample.frag`, `fx_composite.frag`
 
 ## Definition
 
@@ -43,6 +42,15 @@ Key techniques:
   gameplay-relevant) and culls the rest.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Effects Quality → Particle Quality Low/Medium/High/Ultra, Spawn Rate 0.25 / 0.5 / 1 / 1,
+   Effects Resolution Quarter / Half / Full / Full, Flipbook Interpolation off / on / on / on.
+2. Heat haze / distortion is owned by the post-processing thread (`docs/heat_haze_distortion.md`), so it is
+   not part of this bundle here.
+3. Reduced resolution = `geometry.fx` and `geometry.fxDepth` created at 0.5 / 0.25 render scale (`SettingRequiresResize`).
+
 
 - Effects resolution: Full → Half is ~4× fewer blended pixels; Quarter ~16×.
 - Distortion: one extra scene-colour copy + one fullscreen pass (~0.1–0.3 ms at 1440p).

@@ -1,9 +1,9 @@
 # Tessellation and Displacement
 
-Menu: **Geometry → Tessellation** (`Off | Low | Medium | High | Ultra`),
-**Displacement Strength** (0 – 1), **Target Triangle Size** (px, 4 – 32)
-Code: `GeoVfxSettings::tessellation`, `displacement`, `tessTargetPx`;
-shaders `terrain.vert/.tesc/.tese/.frag`
+> Menu: **Geometry → Tessellation / Displacement Strength** (+ debug: Patch Frustum Culling, Show Terrain Triangles)
+> Setting ids: `geometry.tessellation` (Off/Low/Medium/High/Ultra), `world.terrainDisplacement` (0–1 → 0–30 m), `geometry.tessPatchCulling`, `geometry.showTriangles` · Owner module: `geometry.terrain`
+> Presets: Low=Off, Medium=Medium, High=High, Ultra=Ultra
+> Files: `src/modules/geometry/terrain.cpp`, `shaders/geometry/terrain.{vert,tesc,tese,frag}`, `terrain_params.glsl`
 
 ## Definition
 
@@ -41,6 +41,16 @@ sample height map, displace) → [GS] → raster → FS
 D3D11/12 names: Hull shader = TCS, Domain shader = TES. `SV_TessFactor` = `gl_TessLevelOuter`.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 10 — pass "Terrain": draws N×N 4-point patches (`Topology::Patches`) into the core
+   G-buffer (albedo, normal, material, emissive, velocity + scene.depth). Tessellation **Off** draws a static grid
+   with 8 quads per patch edge, displaced in the vertex shader instead.
+2. Level per setting: max factor 1 / 8 / 16 / 32 / 64 and target edge length – / 24 / 16 / 10 / 6 px, capped
+   further by Terrain Quality (16 / 32 / 64 / 64).
+3. Disabled (greyed out) when `Caps::tessellation` is false (the D3D11 cross-compile path).
+
 
 | Setting | Max level | Target px | Typical cost |
 |---------|-----------|-----------|--------------|

@@ -1,10 +1,9 @@
 # Volumetric Fog and Volumetric Clouds
 
-Menu: **Effects → Volumetric Fog** (`Off | Low | Medium | High | Ultra`),
-**Fog Density** (0 – 0.1), **Volumetric Clouds** (`Off | Low | Medium | High`),
-**Cloud Coverage** (0 – 1)
-Code: `GeoVfxSettings::volFog`, `fogDensity`, `clouds`, `cloudCoverage`;
-shader `volumetrics.frag` (fullscreen ray-march)
+> Menu: **Effects → Volumetric Fog / Fog Density / Volumetric Clouds / Cloud Coverage**
+> Setting ids: `effects.volumetricFog` (Off / Low / Medium / High / Ultra), `effects.fogDensity`, `effects.volumetricClouds` (Off / Low / Medium / High), `effects.cloudCoverage` · Owner module: `geometry.volumetrics`
+> Presets: fog Low…Ultra; clouds Off, Low, Medium, High
+> Files: `src/modules/geometry/volumetrics.cpp`, `shaders/geometry/volumetrics.frag`, `fog_composite.frag`
 
 ## Definition
 
@@ -44,6 +43,17 @@ resolution and updated over 16 frames (one pixel of each 4×4 block per frame), 
 temporally reconstructed.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `Translucent`, order 10 (after Water at 5, before particles at 20): optional depth downsample (max),
+   "Volumetrics march" into `geometry.vol` (RGBA16F: in-scatter, transmittance) at 1/4, 1/4, 1/2, 1/2, 1/1 res,
+   then a depth-aware 2×2 upsample that writes `scene.color = scene * T + inscatter`.
+2. Steps per level 0 (analytic) / 16 / 32 / 48 / 96; clouds 0 / 32 / 64 / 128 primary + 0 / 3 / 4 / 6 light steps.
+3. **Sun visibility inside the fog** comes from a short march over the showcase terrain heightfield (hills shadow
+   the valleys → light shafts) on Medium and above. The lighting thread's shadow cascades are not exposed to
+   Translucent passes yet; swapping `sunVisibility()` for a cascade lookup is the upgrade path.
+
 
 | Fog level | Steps / froxel Z | Resolution     | Shadows in fog | Temporal |
 |-----------|------------------|----------------|----------------|----------|

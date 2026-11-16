@@ -1,9 +1,9 @@
 # Decals
 
-Menu: **Effects → Decal Quality** (`Low | Medium | High`), **Max Decals** (32 – 2048),
-**Decal Lifetime** (5 – 120 s)
-Code: `GeoVfxSettings::decalQuality`, `maxDecals`, `decalLifetime`;
-shaders `geometry/decal.vert`, `geometry/decal.frag`
+> Menu: **Effects → Decal Quality / Max Decals / Decal Lifetime**
+> Setting ids: `effects.decalQuality` (Low / Medium / High), `effects.maxDecals` (16–2048), `effects.decalLifetime` (5–120 s) · Owner module: `geometry.decals`
+> Presets: quality Low, Medium, High, High; max 64 / 128 / 256 / 1024; lifetime 10 / 20 / 30 / 60 s
+> Files: `src/modules/geometry/decals.cpp`, `shaders/geometry/decal.{vert,frag}`, `decal_common.glsl`
 
 ## Definition
 
@@ -37,6 +37,15 @@ same light-cluster grid and each material shader loops over the decals in its cl
 Lifetime management: a ring buffer of `maxDecals`; the oldest fade out and are replaced.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 50 — "Decals": copy `gbuffer.normal` and `gbuffer.material`, then one instanced draw of
+   unit boxes into albedo (alpha blend, rgb only), normal (rgb only, shading-model id kept) and material (roughness
+   only). `scene.depth` is **sampled, not attached**, so there is no feedback loop; each box keeps only its back faces
+   (computed from the face normal, so it works with the camera inside the box).
+2. Decals spawn on the plaza at a steady rate of `max / lifetime` per second and the oldest are recycled.
+
 
 | Level  | Channels modified          | Normal-blend | Angle fade | Max decals |
 |--------|----------------------------|--------------|------------|------------|

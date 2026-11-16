@@ -1,8 +1,8 @@
 # Terrain Quality
 
-Menu: **World → Terrain Quality** (`Low | Medium | High | Ultra`)
-Code: `GeoVfxSettings::terrainQuality` → sets patch grid size, tessellation cap, heightmap
-resolution and material layers; shaders `geometry/terrain.*`
+> Menu: **World → Terrain Quality** · Setting id: `world.terrainQuality` (Low / Medium / High / Ultra) · Owner module: `geometry.terrain`
+> Presets: Low…Ultra
+> Files: `src/modules/geometry/terrain.cpp`, `shaders/geometry/terrain.*`, heightfield in `geo_util.cpp` (`HeightField::generate`)
 
 ## Definition
 
@@ -31,6 +31,15 @@ blended per pixel.
    instead of once per pixel per frame.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 10 — same pass as tessellation. Terrain Quality picks the patch grid (16² / 24² / 32² / 48²
+   over 160 m), caps the tessellation factor (16 / 32 / 64 / 64) and the material layers (2 / 3 / 4 / 4, cliffs
+   projected sideways from Medium up).
+2. The heightfield (512² R32F) is generated once on the CPU (fBm + ridges, flattened plaza, lake basin) and the
+   same data is used by the culling occluder, grass placement and the fog's terrain shadows.
+
 
 | Level  | Patch grid | Max tess | Height samples/m | Layers blended | Triplanar |
 |--------|-----------|----------|------------------|----------------|-----------|

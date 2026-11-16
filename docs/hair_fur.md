@@ -1,8 +1,8 @@
 # Hair and Fur Quality (Strand Hair)
 
-Menu: **Characters → Hair Quality** (`Cards | Strands Low | Strands High`),
-**Fur Shells** (0 – 32)
-Code: `GeoVfxSettings::hairQuality`, `furShells`; shaders `geometry/fur_shell.vert/.frag`
+> Menu: **Characters → Fur Quality** · Setting id: `characters.furQuality` (Off / Low / Medium / High = 0 / 8 / 16 / 32 shells) · Owner module: `geometry.characters`
+> Presets: Off, Low, Medium, High
+> Files: `src/modules/geometry/characters.cpp`, `shaders/geometry/fur.{vert,frag}`
 
 ## Definition
 
@@ -37,6 +37,13 @@ a hair passes through; outer shells keep fewer texels (thinner tips). Gravity/wi
 bends outer shells more. Cheap and convincing for short fur and grass-like carpets.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 20 — "Characters": the fur ball on the plaza is one instanced draw of
+   `shells + 1` instances (instance 0 = skin). Strand hair and cards are explained below for reference; the
+   prototype implements the shell technique only.
+
 
 | Mode          | Representation        | Cost driver                         |
 |---------------|-----------------------|-------------------------------------|

@@ -1,9 +1,9 @@
 # Virtualized Geometry (Nanite-style) and Mesh Shaders
 
-Menu: **Geometry → Geometry Pipeline** (`Classic | Meshlet Culling (compute)`),
-**Cluster Error Threshold** (px, 0.5 – 4)
-Code: `GeoVfxSettings::meshletMode`, `clusterErrorPx`; `MeshletBuilder`, shader
-`geometry/meshlet_cull.comp` (compute emulation of task/mesh shaders)
+> Menu: none (reference document) · Related settings: Model Quality, LOD Bias, Occlusion Culling
+> The rhi targets OpenGL 4.5 core and Direct3D 11, which have no mesh/task shaders or 64-bit image atomics,
+> so this technique is documented but not implemented; the LOD (`geometry.lod`) module uses the same
+> projected-error LOD rule per object instead of per cluster.
 
 ## Definition
 

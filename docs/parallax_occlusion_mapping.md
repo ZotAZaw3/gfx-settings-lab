@@ -1,8 +1,9 @@
 # Parallax Occlusion Mapping (POM)
 
-Menu: **Geometry → Parallax Occlusion** (`Off | Low | Medium | High`),
-**POM Depth** (0 – 0.1), **Self-shadowing** (on/off)
-Code: `GeoVfxSettings::pom`, `pomDepth`, `pomShadows`; shader `pom.frag`
+> Menu: **Geometry → Parallax Occlusion Mapping / POM Depth**
+> Setting ids: `geometry.pom` (Off / Low / Medium / High), `geometry.pomDepth` (0–0.15) · Owner module: `geometry.terrain`
+> Presets: Low=Off, Medium=Low, High=Medium, Ultra=High · Self-shadowing is part of Medium (8 steps) and High (16 steps)
+> Files: `src/modules/geometry/terrain.cpp` (`drawPom`), `shaders/geometry/pom.{vert,frag}`, `pom_params.glsl`
 
 ## Definition
 
@@ -39,6 +40,16 @@ Limitations: silhouettes stay flat (the polygon edge is still straight), and it 
 on strongly curved surfaces. Use tessellation for silhouettes.
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `GBuffer`, order 12 — pass "POM floor": a 12 × 12 m procedural brick floor on the plaza
+   (512² R8 depth map + RGBA8 albedo, both mipmapped). Off = the same depth map used only as a normal source.
+2. The mip level is computed once from the original UV derivatives and passed to `textureLod` inside the loop
+   (portable to the D3D11 cross-compile, avoids undefined derivatives in divergent loops).
+3. Self-shadow darkens albedo (the G-buffer has no per-pixel sun mask a module may write) and cavity depth goes
+   into material AO.
+
 
 | Level  | Min / max layers | Refinement | Shadow steps |
 |--------|------------------|------------|--------------|

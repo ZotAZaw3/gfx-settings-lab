@@ -1,9 +1,9 @@
 # Variable Rate Shading (VRS)
 
-Menu: **Performance → Variable Rate Shading** (`Off | Quality | Balanced | Performance`),
-**VRS Debug Overlay** (on/off)
-Code: `GeoVfxSettings::vrs`, `vrsOverlay`; `VrsController` (hardware path when
-`GL_NV_shading_rate_image` exists, software emulation otherwise); shader `geometry/vrs_image.comp`
+> Menu: **Performance → Variable Rate Shading** (+ debug: VRS Overlay)
+> Setting ids: `performance.vrs` (Off / Quality / Balanced / Performance), `performance.vrsOverlay` · Owner module: `geometry.vrs`
+> Presets: Low=Performance, Medium=Balanced, High=Off, Ultra=Off
+> Files: `src/modules/geometry/vrs.cpp`, `shaders/geometry/vrs_rate.comp`, `vrs_apply.frag`
 
 ## Definition
 
@@ -36,6 +36,16 @@ A **combiner** decides how per-draw, per-primitive and image rates merge (passth
 override, min, max).
 
 ## Breakdown
+
+**In this prototype:**
+
+1. Stage `Translucent`, order 1 (right after lighting wrote `scene.color`): "VRS rate image" compute builds a
+   R32UI image, one texel per 16×16 tile, from luminance contrast (thresholds 0.02 / 0.05 / 0.09) and motion
+   (`scene.velocity`, tiles moving > 12 / 6 px get one rate coarser).
+2. "VRS apply" broadcasts one shaded sample per 2×2 / 4×4 block, which is exactly what hardware VRS does to the
+   pixel shader's output. **This is an emulation**: the rhi (GL 4.5 core / D3D11) has no shading-rate API, so you see
+   the image-quality cost but not the speed-up. The measured cost below is the emulation's overhead.
+
 
 | Mode        | Max coarse rate | Contrast threshold | Typical pixel-shader saving |
 |-------------|-----------------|--------------------|-----------------------------|

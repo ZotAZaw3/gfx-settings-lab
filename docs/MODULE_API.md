@@ -125,6 +125,7 @@ GFX_REGISTER_MODULE(SsaoModule);
 | `bindShadingResources(FrameContext&)` | before any pass that includes `lighting/shade.glsl` | lighting binds shadow maps, probes, LUTs |
 | `onGui(FrameContext&)` | every frame in UI | optional debug window |
 | `cpuMemoryBytes()` | profiler | report CPU-side memory you hold |
+| `offThreadCpuMs()` | profiler | CPU ms/frame spent on your own threads (audio mixer, workers); counted in frame CPU time and per-setting Δ CPU |
 | `shutdown(Engine&)` | exit | release |
 
 `Engine` accessors: `device()`, `settings()`, `shaders()`, `scene()`, `renderer()`, `targets()`,

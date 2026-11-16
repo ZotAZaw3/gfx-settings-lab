@@ -20,6 +20,7 @@ static void usage() {
 }
 
 int main(int argc, char** argv) {
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);   // line-buffered logs when piped (CI, bench)
     gfx::EngineConfig cfg;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];

@@ -29,7 +29,7 @@ void Engine::setupCoreSettings() {
         .changed([this](Setting&) { applyWindowMode(); });
     s.addEnum({.id = "display.vsync", .label = "V-Sync", .category = "Display", .group = "Sync",
                .tooltip = "Wait for the display refresh before showing a frame: no tearing, more latency.",
-               .doc = "latency_sync", .flags = SettingNoPreset}, {"Off", "On", "Adaptive", "Half rate"}, 1)
+               .doc = "vsync", .flags = SettingNoPreset}, {"Off", "On", "Adaptive", "Half rate"}, 1)
         .changed([this](Setting&) { applyDisplaySettings(); });
     s.addFloat({.id = "display.frameCap", .label = "Frame Rate Limit", .category = "Display", .group = "Sync",
                 .tooltip = "Caps the frame rate (0 = unlimited). Steadier frame pacing, lower power and heat.",
@@ -84,10 +84,10 @@ void Engine::setupCoreSettings() {
     // ---------------- Latency ----------------
     s.addEnum({.id = "latency.mode", .label = "Low Latency Mode", .category = "Latency", .group = "Latency",
                .tooltip = "Reflex/Anti-Lag style: limit the render queue to 1 frame and sample input just before rendering. Boost also drains the GPU each frame.",
-               .doc = "latency_sync", .flags = SettingNoPreset}, {"Off", "On", "On + Boost"}, 0);
+               .doc = "low_latency", .flags = SettingNoPreset}, {"Off", "On", "On + Boost"}, 0);
     s.addInt({.id = "latency.maxFramesInFlight", .label = "Max Frames in Flight", .category = "Latency", .group = "Latency",
               .tooltip = "How many frames the CPU may queue ahead of the GPU (render-ahead). More = smoother under load, more input lag.",
-              .doc = "latency_sync", .flags = SettingNoPreset}, 2, 1, 4)
+              .doc = "low_latency", .flags = SettingNoPreset}, 2, 1, 4)
         .enabled([this] { return settings_.getInt("latency.mode") == 0; });
 
     // ---------------- Graphics ----------------
@@ -114,6 +114,10 @@ void Engine::setupCoreSettings() {
                .tooltip = "Show an intermediate buffer instead of the final image.", .doc = "performance_overlay",
                .flags = SettingNoPreset},
               {"Final", "Albedo", "Normal", "Roughness", "Metallic", "Material AO", "Depth", "Velocity", "Emissive", "Scene HDR (pre-post)"}, 0);
+    s.addBool({.id = "shaders.cache", .label = "Shader Cache", .category = "Graphics", .group = "Shaders",
+               .tooltip = "Store compiled shader binaries on disk and reuse them: faster startup and no recompile hitches on the next run.",
+               .doc = "shader_cache_precompilation", .flags = SettingNoPreset | SettingRequiresReload}, true)
+        .changed([this](Setting& st) { device_->setProgramCacheDir(st.asBool() ? "shader_cache" : ""); });
     s.addBool({.id = "shaders.hotReload", .label = "Shader Hot Reload", .category = "Debug", .group = "Shaders",
                .tooltip = "Watch shaders/ and recompile changed programs live (F5 forces a full reload).", .doc = "shader_hot_reload",
                .flags = SettingNoPreset}, true);

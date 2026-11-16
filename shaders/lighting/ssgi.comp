@@ -1,0 +1,47 @@
+#version 450
+// ssgi.comp - screen-space GI: cosine-distributed rays through the depth buffer gather last
+// frame's lit color as one-bounce indirect light. Misses fall back to probes (confidence < 1).
+#include "lighting/lighting_common.glsl"
+#include "lighting/ss_trace.glsl"
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 1) uniform sampler2D uGNormal;
+layout(binding = 3) uniform sampler2D uDepth;
+layout(binding = 5) uniform sampler2D uPrevColor;
+layout(rgba16f, binding = 0) uniform writeonly image2D uOut;
+layout(std140, binding = 3) uniform SSGIPass { vec4 uSSGIPass; };
+#define uOutSize uSSGIPass.xy
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(vec2(px), uOutSize))) return;
+    vec2 uv = (vec2(px) + 0.5) / uOutSize;
+    float d = textureLod(uDepth, uv, 0.0).r;
+    if (isSky(d)) { imageStore(uOut, px, vec4(0)); return; }
+    vec3 P = viewPosFromDepth(uv, d);
+    vec3 N = normalize(mat3(uView) * textureLod(uGNormal, uv, 0.0).xyz);
+    mat3 TBN = tangentFrame(N);
+    int rays = uGICfg.z;
+    float j = ign(vec2(px), frameIndex());
+    vec3 sum = vec3(0); float hits = 0.0;
+    for (int r = 0; r < rays; ++r) {
+        vec2 u = fract(hammersley(uint(r), uint(rays)) + vec2(j, hash12(vec2(px) + float(frameIndex() & 255))));
+        vec3 dir = TBN * cosineSample(u);
+        vec2 hit;
+        // short rays: SSGI is about near-field bounce
+        vec3 origin = P + N * 0.02 * -P.z;
+        if (traceScreen(origin, dir * uGIParams.y, uGICfg.w, 0.5, j, 0, hit)) {
+            vec3 hws = worldPosFromDepth(hit, textureLod(uDepth, hit, 0.0).r);
+            vec4 pc = uPrevViewProj * vec4(hws, 1.0);
+            vec2 puv = ndcToUv(pc.xy / pc.w);
+            vec3 hitN = textureLod(uGNormal, hit, 0.0).xyz;
+            float facing = clamp(dot(hitN, -(mat3(uInvView) * dir)) * 2.0, 0.0, 1.0);  // back faces emit nothing
+            sum += min(textureLod(uPrevColor, puv, 1.0).rgb, vec3(16.0)) * facing;
+            hits += 1.0;
+        }
+    }
+    // Cosine-weighted estimator: average radiance of the rays that hit = irradiance/PI.
+    // Rays that missed see distant lighting, which shade.glsl takes from the probes:
+    // final = mix(probe, rgb, a) with a = hit fraction.
+    vec3 irr = sum / max(hits, 1.0) * uGIParams.x;
+    imageStore(uOut, px, vec4(irr, hits / float(rays)));
+}

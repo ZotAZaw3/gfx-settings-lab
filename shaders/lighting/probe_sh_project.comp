@@ -1,0 +1,44 @@
+#version 450
+// probe_sh_project.comp - project one captured probe cubemap onto L2 spherical harmonics and
+// write its 27 coefficients (7 vec4) into the probe grid SSBO read by shade.glsl.
+#include "lighting/lighting_common.glsl"
+layout(local_size_x = 64) in;
+layout(binding = 6) uniform samplerCube uProbeCube;
+layout(std140, binding = 3) uniform ProbePass { ivec4 uProbe; };   // x = linear probe index
+layout(std430, binding = 4) buffer ProbeOut { vec4 probeSHOut[]; };
+shared vec3 sC[64][9];
+
+void main() {
+    uint t = gl_LocalInvocationIndex;
+    vec3 c[9];
+    for (int k = 0; k < 9; ++k) c[k] = vec3(0);
+    const uint N = 64u * 32u;                       // 2048 directions, uniform sphere
+    for (uint i = t; i < N; i += 64u) {
+        vec2 u = hammersley(i, N);
+        float z = 1.0 - 2.0 * u.x, r = sqrt(max(0.0, 1.0 - z * z)), phi = 2.0 * PI * u.y;
+        vec3 d = vec3(r * cos(phi), r * sin(phi), z);
+        vec3 L = textureLod(uProbeCube, d, 0.0).rgb;
+        float Y[9] = float[](0.282095, 0.488603 * d.y, 0.488603 * d.z, 0.488603 * d.x,
+            1.092548 * d.x * d.y, 1.092548 * d.y * d.z, 0.315392 * (3.0 * d.z * d.z - 1.0),
+            1.092548 * d.x * d.z, 0.546274 * (d.x * d.x - d.y * d.y));
+        for (int k = 0; k < 9; ++k) c[k] += L * Y[k];
+    }
+    for (int k = 0; k < 9; ++k) sC[t][k] = c[k];
+    barrier();
+    for (uint s = 32u; s > 0u; s >>= 1u) {
+        if (t < s) for (int k = 0; k < 9; ++k) sC[t][k] += sC[t + s][k];
+        barrier();
+    }
+    if (t == 0u) {
+        float w = 4.0 * PI / float(N);
+        vec3 r[9];
+        for (int k = 0; k < 9; ++k) r[k] = sC[0][k] * w;
+        probeSHOut[uProbe.x * 7 + 0] = vec4(r[0], r[1].x);
+        probeSHOut[uProbe.x * 7 + 1] = vec4(r[1].yz, r[2].xy);
+        probeSHOut[uProbe.x * 7 + 2] = vec4(r[2].z, r[3]);
+        probeSHOut[uProbe.x * 7 + 3] = vec4(r[4], r[5].x);
+        probeSHOut[uProbe.x * 7 + 4] = vec4(r[5].yz, r[6].xy);
+        probeSHOut[uProbe.x * 7 + 5] = vec4(r[6].z, r[7]);
+        probeSHOut[uProbe.x * 7 + 6] = vec4(r[8], 0.0);
+    }
+}

@@ -1,0 +1,55 @@
+#version 450
+// ssr.comp - screen-space reflections (docs/reflections.md). Output rgb = reflected radiance
+// from the previous frame (reprojected), a = confidence. Glossy: GGX-jittered ray + mip by roughness.
+#include "lighting/lighting_common.glsl"
+#include "lighting/ss_trace.glsl"
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 1) uniform sampler2D uGNormal;
+layout(binding = 2) uniform sampler2D uGMaterial;
+layout(binding = 3) uniform sampler2D uDepth;
+layout(binding = 5) uniform sampler2D uPrevColor;     // last frame's lit HDR, with mips
+layout(rgba16f, binding = 0) uniform writeonly image2D uOut;
+layout(std140, binding = 3) uniform SSRPass { vec4 uSSRPass; };   // xy size, z hiz mode
+#define uOutSize uSSRPass.xy
+#define uHiZMode int(uSSRPass.z)
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(vec2(px), uOutSize))) return;
+    vec2 uv = (vec2(px) + 0.5) / uOutSize;
+    float d = textureLod(uDepth, uv, 0.0).r;
+    vec4 mat = textureLod(uGMaterial, uv, 0.0);
+    float rough = mat.r;
+    if (isSky(d) || rough > uReflParams.x) { imageStore(uOut, px, vec4(0)); return; }
+    vec3 P = viewPosFromDepth(uv, d);
+    vec3 N = normalize(mat3(uView) * textureLod(uGNormal, uv, 0.0).xyz);
+    vec3 V = normalize(-P);
+    // GGX importance-sampled half vector for glossy reflections (rough -> wider)
+    float a = rough * rough;
+    vec2 u = vec2(ign(vec2(px), frameIndex()), hash12(vec2(px) + float(frameIndex())));
+    u.y *= 0.7;                                  // trim the tail to reduce noise
+    float phi = 2.0 * PI * u.x;
+    float cosT = sqrt((1.0 - u.y) / (1.0 + (a * a - 1.0) * u.y));
+    float sinT = sqrt(1.0 - cosT * cosT);
+    vec3 H = tangentFrame(N) * vec3(sinT * cos(phi), sinT * sin(phi), cosT);
+    vec3 R = reflect(-V, H);
+    if (dot(R, N) <= 0.0) R = reflect(-V, N);
+
+    vec2 hit;
+    vec3 origin = P + N * 0.01 * -P.z;
+    bool ok = traceScreen(origin, R, uReflCfg.z, uReflParams.y, u.x, uHiZMode, hit);
+    if (!ok) { imageStore(uOut, px, vec4(0)); return; }
+    // reproject hit to last frame
+    vec3 hitWS = worldPosFromDepth(hit, textureLod(uDepth, hit, 0.0).r);
+    vec4 pc = uPrevViewProj * vec4(hitWS, 1.0);
+    vec2 puv = ndcToUv(pc.xy / pc.w);
+    if (any(lessThan(puv, vec2(0))) || any(greaterThan(puv, vec2(1)))) { imageStore(uOut, px, vec4(0)); return; }
+    float mip = rough * 5.0;
+    vec3 col = textureLod(uPrevColor, puv, mip).rgb;
+    // confidence: screen edge fade, roughness fade, facing-camera fade
+    vec2 e = smoothstep(vec2(0.0), vec2(0.08), hit) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - hit);
+    float conf = e.x * e.y;
+    conf *= 1.0 - smoothstep(uReflParams.x * 0.7, uReflParams.x, rough);
+    conf *= smoothstep(-0.1, 0.2, -R.z) * 0.5 + 0.5 * step(R.z, 0.5);
+    imageStore(uOut, px, vec4(min(col, vec3(64.0)), clamp(conf, 0.0, 1.0)));
+}

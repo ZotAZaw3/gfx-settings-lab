@@ -1,0 +1,50 @@
+#version 450
+// sss_blur.comp - separable screen-space subsurface scattering (Jimenez 2015), run H then V.
+// The kernel (rgb weight, offset) is built on the CPU from a sum-of-Gaussians skin profile.
+// Final V pass adds the blurred diffuse into scene color. (docs/subsurface_scattering.md)
+#include "lighting/lighting_common.glsl"
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 1) uniform sampler2D uGNormal;      // w = shading model id / 255 (1 = subsurface)
+layout(binding = 3) uniform sampler2D uDepth;
+layout(binding = 5) uniform sampler2D uIn;                 // SSS diffuse (or H result)
+layout(rgba16f, binding = 0) uniform image2D uOut;         // temp, or scene color on final pass
+layout(std140, binding = 3) uniform SSSPass {
+    vec4  uSSSDirA;      // xy direction
+    ivec4 uSSSCfgP;      // x taps, y accumulate (1 = add into uOut on the final pass)
+    vec4  uKernel[25];   // rgb = weight, a = offset in [-3,3] (in units of the SSS width)
+};
+#define uDir uSSSDirA.xy
+#define uTaps uSSSCfgP.x
+#define uAccumulate uSSSCfgP.y
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(px, ivec2(uRenderSize.xy)))) return;
+    vec2 uv = (vec2(px) + 0.5) * uRenderSize.zw;
+    int model = int(textureLod(uGNormal, uv, 0.0).w * 255.0 + 0.5);
+    vec4 center = textureLod(uIn, uv, 0.0);
+    if (model != 1) {           // not SSS: pass through (H pass) / nothing to add (V pass)
+        if (uAccumulate == 0) imageStore(uOut, px, center);
+        return;
+    }
+    float d = textureLod(uDepth, uv, 0.0).r;
+    float zc = -viewPosFromDepth(uv, d).z;
+    // world-space width -> pixels at this depth
+    float scale = uSSSParams.x * uProj[1][1] * 0.5 * uRenderSize.y / zc / 3.0;
+    vec3 sum = center.rgb * uKernel[0].rgb;
+    for (int i = 1; i < uTaps; ++i) {
+        vec2 o = uDir * uKernel[i].a * scale * uRenderSize.zw;
+        vec2 suv = uv + o;
+        vec3 c = textureLod(uIn, suv, 0.0).rgb;
+        // depth-aware: lerp back to center when the tap crosses a silhouette
+        float z = -viewPosFromDepth(suv, max(textureLod(uDepth, suv, 0.0).r, 1e-7)).z;
+        float w = clamp(300.0 * uSSSParams.x * abs(z - zc) / zc, 0.0, 1.0);
+        int m = int(textureLod(uGNormal, suv, 0.0).w * 255.0 + 0.5);
+        if (m != 1) w = 1.0;
+        sum += mix(c, center.rgb, w) * uKernel[i].rgb;
+    }
+    if (uAccumulate != 0) {
+        vec4 dst = imageLoad(uOut, px);
+        imageStore(uOut, px, vec4(dst.rgb + sum, dst.a));
+    } else imageStore(uOut, px, vec4(sum, 1.0));
+}

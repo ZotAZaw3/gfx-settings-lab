@@ -1,0 +1,42 @@
+#version 450
+// ibl_prefilter.comp - GGX importance-sampled prefilter, one mip (roughness) per dispatch.
+// Uses "filtered importance sampling" (sample a lower mip by pdf) to kill fireflies.
+#include "lighting/lighting_common.glsl"
+float D_GGX_pf(float NoH, float a) { float a2 = a*a; float d = (NoH*a2 - NoH)*NoH + 1.0; return a2 / (PI*d*d + 1e-7); }
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(binding = 6) uniform samplerCube uSrc;
+layout(rgba16f, binding = 0) uniform writeonly imageCube uDst;
+layout(std140, binding = 3) uniform PrefilterPass { vec4 uPF; };   // x roughness, y samples
+#define uRoughness uPF.x
+#define uSamples int(uPF.y)
+
+void main() {
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+    int size = imageSize(uDst).x;
+    if (id.x >= size || id.y >= size) return;
+    vec3 N = cubeDir(id, float(size));
+    if (uRoughness <= 0.0) { imageStore(uDst, id, vec4(textureLod(uSrc, N, 0.0).rgb, 1)); return; }
+    vec3 V = N;
+    mat3 TBN = tangentFrame(N);
+    float a = uRoughness * uRoughness;
+    float srcSize = float(textureSize(uSrc, 0).x);
+    float saTexel = 4.0 * PI / (6.0 * srcSize * srcSize);
+    vec3 sum = vec3(0); float wsum = 0.0;
+    for (int i = 0; i < uSamples; ++i) {
+        vec2 u = hammersley(uint(i), uint(uSamples));
+        float phi = 2.0 * PI * u.x;
+        float cosT = sqrt((1.0 - u.y) / (1.0 + (a * a - 1.0) * u.y));
+        float sinT = sqrt(1.0 - cosT * cosT);
+        vec3 H = TBN * vec3(sinT * cos(phi), sinT * sin(phi), cosT);
+        vec3 L = reflect(-V, H);
+        float NoL = dot(N, L);
+        if (NoL <= 0.0) continue;
+        float NoH = max(dot(N, H), 0.0);
+        float pdf = D_GGX_pf(NoH, a) * 0.25;
+        float saSample = 1.0 / (float(uSamples) * pdf + 1e-5);
+        float mip = 0.5 * log2(saSample / saTexel) + 1.0;
+        sum += textureLod(uSrc, L, max(mip, 0.0)).rgb * NoL;
+        wsum += NoL;
+    }
+    imageStore(uDst, id, vec4(sum / max(wsum, 1e-4), 1));
+}

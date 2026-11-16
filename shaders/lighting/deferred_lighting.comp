@@ -1,0 +1,122 @@
+#version 450
+// deferred_lighting.comp - tiled deferred resolve -> scene.color. One 16x16 workgroup = one tile.
+// 1) tile min/max view depth, 2) cull lights against the tile's view-space AABB into shared
+// memory, 3) shade each pixel with shadeSurfaceSplit() using only that tile's lights.
+// With tiling off (Low/Medium light quality) every pixel loops over the first N lights.
+// SSS pixels write their diffuse to lighting.sssDiffuse; sss_blur.comp adds it back blurred.
+#include "common/surface.glsl"
+#include "lighting/lighting_common.glsl"
+
+#define TILE 16
+#define MAX_TILE_LIGHTS 256
+shared uint sMinZ, sMaxZ, sCount;
+shared uint sList[MAX_TILE_LIGHTS];
+
+#define LIGHT_LIST_COUNT() (uLightCfg2.y != 0 ? int(sCount) : min(int(uCounts.x), uLightCfg.y))
+#define LIGHT_LIST_GET(i)  (uLightCfg2.y != 0 ? int(sList[i]) : (i))
+#include "lighting/shade.glsl"
+
+layout(local_size_x = TILE, local_size_y = TILE) in;
+layout(binding = 0) uniform sampler2D tGAlbedo;     // rgb base color, a specular occlusion
+layout(binding = 1) uniform sampler2D tGNormal;     // xyz world normal, w shading model / 255
+layout(binding = 2) uniform sampler2D tGMaterial;   // r rough, g metal, b ao, a reflectance
+layout(binding = 3) uniform sampler2D tGEmissive;   // rgb emissive, a sss mask
+layout(binding = 4) uniform sampler2D tDepth;
+layout(binding = 5) uniform sampler2D tPlanar;      // planar reflection (black when off)
+layout(rgba16f, binding = 0) uniform writeonly image2D uSceneColor;
+layout(rgba16f, binding = 1) uniform writeonly image2D uSSSDiffuse;
+
+void main() {
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = ivec2(uRenderSize.xy);
+    bool inside = all(lessThan(px, size));
+    uint li = gl_LocalInvocationIndex;
+    if (li == 0u) { sMinZ = 0x7F7FFFFFu; sMaxZ = 0u; sCount = 0u; }
+    barrier();
+
+    float depth = inside ? texelFetch(tDepth, px, 0).r : 0.0;
+    vec2 uv = (vec2(px) + 0.5) * uRenderSize.zw;
+    bool sky = isSky(depth);
+    if (inside && !sky) {
+        float vz = linearDepth(depth);
+        atomicMin(sMinZ, floatBitsToUint(vz));   // positive floats sort like uints
+        atomicMax(sMaxZ, floatBitsToUint(vz));
+    }
+    barrier();
+
+    if (uLightCfg2.y != 0) {
+        float zn = uintBitsToFloat(sMinZ), zf = uintBitsToFloat(sMaxZ);
+        if (zf >= zn) {
+            vec2 t0 = vec2(gl_WorkGroupID.xy * uint(TILE)) * uRenderSize.zw;
+            vec2 t1 = vec2((gl_WorkGroupID.xy + 1u) * uint(TILE)) * uRenderSize.zw;
+            vec2 cuv[4] = vec2[](t0, vec2(t1.x, t0.y), vec2(t0.x, t1.y), t1);
+            vec3 bmin = vec3(1e30), bmax = vec3(-1e30);
+            for (int i = 0; i < 4; ++i) {
+                vec3 c = viewPosFromDepth(cuv[i], 0.5);
+                vec3 dir = c / -c.z;                       // ray scaled so that -z = 1
+                vec3 a = dir * zn, b = dir * zf;
+                bmin = min(bmin, min(a, b)); bmax = max(bmax, max(a, b));
+            }
+            int total = min(int(uCounts.x), uLightCfg.y);
+            for (int i = int(li); i < total; i += TILE * TILE) {
+                vec4 pr = lights[i].positionRange;
+                vec3 lv = (uView * vec4(pr.xyz, 1.0)).xyz;
+                vec3 cl = clamp(lv, bmin, bmax);
+                if (dot(cl - lv, cl - lv) <= pr.w * pr.w) {
+                    uint slot = atomicAdd(sCount, 1u);
+                    if (slot < uint(MAX_TILE_LIGHTS)) sList[slot] = uint(i);
+                }
+            }
+        }
+        barrier();
+        if (li == 0u) sCount = min(sCount, uint(MAX_TILE_LIGHTS));
+        barrier();
+    }
+
+    if (!inside) return;
+    if (sky) {   // background: the environment cube (procedural sky or HDR), mip 0
+        vec3 dir = normalize(worldPosFromDepth(uv, 1e-6) - uCameraPos.xyz);
+        imageStore(uSceneColor, px, vec4(textureLod(tEnvPrefiltered, dir, 0.0).rgb, 1.0));
+        return;
+    }
+
+    vec4 alb = texelFetch(tGAlbedo, px, 0);
+    vec4 nrm = texelFetch(tGNormal, px, 0);
+    vec4 mat = texelFetch(tGMaterial, px, 0);
+    vec4 emi = texelFetch(tGEmissive, px, 0);
+    Surface s;
+    s.position = worldPosFromDepth(uv, depth);
+    s.normal = normalize(nrm.xyz);
+    s.albedo = alb.rgb;
+    s.roughness = clamp(mat.r, 0.03, 1.0);
+    s.metallic = mat.g;
+    s.ao = mat.b * alb.a;
+    s.emissive = emi.rgb;
+    s.shadingModel = int(nrm.w * 255.0 + 0.5);
+    s.sssMask = emi.a;
+
+    vec3 V = normalize(uCameraPos.xyz - s.position);
+    vec3 emissive = s.emissive * uGround.w;
+    if (s.shadingModel == SHADING_UNLIT) { imageStore(uSceneColor, px, vec4(s.albedo + emissive, 1)); return; }
+
+    vec3 d, sp;
+    shadeSurfaceSplit(s, V, uv, d, sp);
+
+    // planar reflection: smooth surfaces lying on the reflection plane
+    if (uReflCfg.w != 0 && abs(s.position.y - uReflParams.w) < 0.02 && s.normal.y > 0.9) {
+        vec3 pl = textureLod(tPlanar, uv + s.normal.xz * 0.02, 0.0).rgb;
+        float NoV = clamp(dot(s.normal, V), 1e-4, 1.0);
+        vec3 f0 = mix(vec3(0.04), s.albedo, s.metallic);
+        vec2 ab = sampleBrdfLut(NoV, s.roughness);
+        float w = 1.0 - smoothstep(0.1, 0.4, s.roughness);
+        sp = mix(sp, sp - envSpecular(s, V, uv) * (f0 * ab.x + ab.y) + pl * (f0 * ab.x + ab.y), w);
+    }
+
+    bool sssPixel = (s.shadingModel == SHADING_SUBSURFACE) && uSSSCfg.x == 2;
+    if (sssPixel) {
+        imageStore(uSSSDiffuse, px, vec4(d, 1.0));
+        imageStore(uSceneColor, px, vec4(sp + emissive, 1.0));
+    } else {
+        imageStore(uSceneColor, px, vec4(d + sp + emissive, 1.0));
+    }
+}

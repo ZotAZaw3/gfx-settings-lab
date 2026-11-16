@@ -1,0 +1,13 @@
+#version 450
+// copy_color.comp - copies lit scene.color into mip 0 of the lighting history (SSR / SSGI source).
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D tSrc;
+layout(rgba16f, binding = 0) uniform writeonly image2D uDst;
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(p, imageSize(uDst)))) return;
+    vec4 c = texelFetch(tSrc, p, 0);
+    // drop NaN/Inf so a single bad pixel can't smear through reflections
+    if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0);
+    imageStore(uDst, p, vec4(min(c.rgb, vec3(256.0)), 1.0));
+}
